@@ -48,4 +48,22 @@ class FCNN(nn.Module):
     Args:
         nn (_type_): _description_
     """
-    ...
+    def __init__(self, input_dim=10, hidden_dim=5, num_hidden=2, output_dim=1, activation=nn.Identity()):
+        super(FCNN, self).__init__()
+        self.layers = nn.ModuleList()
+        
+        self.layers.append(nn.Linear(input_dim, hidden_dim))
+        self.layers.append(nn.ReLU())
+        
+        for _ in range(num_hidden - 1):
+            self.layers.append(nn.Linear(hidden_dim, hidden_dim))
+            self.layers.append(nn.ReLU())
+        
+        self.layers.append(nn.Linear(hidden_dim, output_dim))
+        self.layers.append(activation)
+    
+    def forward(self, x):
+        for layer in self.layers:
+            x = layer(x)
+        
+        return x

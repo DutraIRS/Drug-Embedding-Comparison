@@ -5,6 +5,8 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 
 from src import models
 
+import torch
+
 class TestVAE:
     def test_init(self):
         """
@@ -24,7 +26,7 @@ class TestFCNN:
         assert isinstance(model, models.FCNN)
         assert isinstance(model, models.nn.Module)
         assert isinstance(model.layers, models.nn.ModuleList)
-        assert len(model.layers) == 2
+        assert len(model.layers) == 6
     
     def test_forward(self):
         """
