@@ -44,11 +44,18 @@ class FP(nn.Module):
 
 class FCNN(nn.Module):
     """Fully Connected Neural Network
-
-    Args:
-        nn (_type_): _description_
     """
-    def __init__(self, input_dim=10, hidden_dim=5, num_hidden=2, output_dim=1, activation=nn.Identity()):
+    def __init__(self, input_dim: int = 10, hidden_dim: int = 5, num_hidden: int = 2,
+                output_dim: int = 1, activation: nn.Modeule = nn.Identity()):
+        """Initialize the FCNN model
+
+        Args:
+            input_dim (int, optional): Size of the input tensor. Defaults to 10.
+            hidden_dim (int, optional): Size of the hidden layer(s). Defaults to 5.
+            num_hidden (int, optional): Number of hidden layers. Defaults to 2.
+            output_dim (int, optional): Size of the output tensor. Defaults to 1.
+            activation (nn.Module, optional): Activation function for the output layer. Defaults to nn.Identity().
+        """
         super(FCNN, self).__init__()
         self.layers = nn.ModuleList()
         
@@ -62,7 +69,15 @@ class FCNN(nn.Module):
         self.layers.append(nn.Linear(hidden_dim, output_dim))
         self.layers.append(activation)
     
-    def forward(self, x):
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        """Forward pass of the FCNN model
+
+        Args:
+            x (torch.Tensor): Input tensor
+
+        Returns:
+            torch.Tensor: Output tensor
+        """
         for layer in self.layers:
             x = layer(x)
         
