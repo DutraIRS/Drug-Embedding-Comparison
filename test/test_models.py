@@ -24,14 +24,14 @@ class TestVAE:
         model = models.VAE(input_dim=128, hidden_dim=64, latent_dim=8)
         x = torch.randn(50, 128)
         
-        y, mu, sigma = model(x)
+        y, mu, logvar = model(x)
         
         assert isinstance(y, torch.Tensor)
         assert y.shape == (50, 128)
         assert isinstance(mu, torch.Tensor)
-        assert mu.shape == 8
-        assert isinstance(sigma, torch.Tensor)
-        assert sigma.shape == 8
+        assert mu.shape == (50, 8)
+        assert isinstance(logvar, torch.Tensor)
+        assert logvar.shape == (50, 8)
     
     def test_model_number_of_parameters(self):
         """
