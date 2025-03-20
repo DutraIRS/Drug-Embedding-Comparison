@@ -1,6 +1,8 @@
 import torch
 import torch.nn as nn
 
+from src import models
+
 class GCNConv(nn.Module):
     """Graph Convolutional Network Convolution Layer
     """
@@ -100,3 +102,14 @@ class GATConv(nn.Module):
         V = X @ self.Wv
         
         return self.masked_attention(Q, K, V, A)
+
+class MessagePassing(nn.Module):
+    def __init__(self, input_dim, hidden_dim, num_hidden, output_dim, activation):
+        super(MessagePassing, self).__init__()
+        
+        self.MLP = models.FCNN(input_dim, hidden_dim, num_hidden, output_dim, activation)
+    
+    def forward(self, X, A):
+        A += torch.eye(A.size()[0])
+        
+        return A @ self.MLP(X) # FCNN treats rows as independent datapoints in a batch
