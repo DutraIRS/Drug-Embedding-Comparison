@@ -1,4 +1,11 @@
-from typing import Tuple
+import sys
+import os
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+from src.layers import GCNConv, GATConv, MessagePassing
+
+from typing import Tuple, Literal
 
 import torch
 import torch.nn as nn
@@ -31,17 +38,17 @@ class VAE(nn.Module):
         self.fc7 = nn.Linear(hidden_dim, input_dim)
         self.fc8 = nn.Linear(input_dim, input_dim)
     
-    def encode(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+    def encode(self, X: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         """Encode the input tensor
 
         Args:
-            x (torch.Tensor): Input tensor
+            X (torch.Tensor): Input tensor
 
         Returns:
             mu (torch.Tensor): Mean of latent space
             logvar (torch.Tensor): Log variance of latent space
         """
-        h = F.relu(self.fc1(x))
+        h = F.relu(self.fc1(X))
         h = F.relu(self.fc2(h))
         h = F.relu(self.fc3(h))
         
@@ -82,46 +89,101 @@ class VAE(nn.Module):
         
         return h
     
-    def forward(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    def forward(self, X: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
         """Forward pass
 
         Args:
-            x (torch.Tensor): Input tensor
+            X (torch.Tensor): Input tensor
 
         Returns:
             y (torch.Tensor): Reconstructed input tensor
             mu (torch.Tensor): Mean of latent space
             logvar (torch.Tensor): Log variance of latent space
         """
-        mu, logvar = self.encode(x)
+        mu, logvar = self.encode(X)
         z = self.reparameterize(mu, logvar)
         y = self.decode(z)
         
         return y, mu, logvar
 
-class GSA(nn.Module):
-    """Graph Self-Attention
-
-    Args:
-        nn (_type_): _description_
-    """
-    ...
-
 class GNN(nn.Module):
     """Graph Neural Network
-
-    Args:
-        nn (_type_): _description_
     """
-    ...
+    def __init__(self, layer: Literal["GCNConv", "GATConv", "MessagePassing"],
+                num_layers: int, input_dim: int, output_dim: int, **kwargs):
+        """Initialize a GNN model with specified type of layer
 
-class MPGNN(nn.Module):
-    """Message Passing Graph Neural Network
+        Args:
+            layer (Literal["GCNConv", "GATConv", "MessagePassing"]): Type of layer to be used
+            num_layers (int): Number of layers to chain
+            input_dim (int): Initial number of features in each node
+            output_dim (int): Final number of features in each node
+        
+        Kwargs:
+            hidden_dim (int): Size of the hidden layer(s) for each GNN layer. Used for GATConv and MessagePassing
+            num_hidden (int): Number of hidden layers for each GNN layer. Used for MessagePassing
+            activation (nn.Module): Activation function for the output layer of each GNN layer
+        """
+        super(GNN, self).__init__()
+        
+        self.layers = nn.ModuleList()
+        
+        if layer == "GCNConv":
+            self.layers.append(
+                    GCNConv(input_dim, output_dim)
+                )
+            
+            for _ in range(num_layers - 1):
+                self.layers.append(
+                    GCNConv(output_dim, output_dim)
+                )
+        elif layer == "GATConv":
+            if 'hidden_dim' not in kwargs.keys():
+                raise TypeError("GATConv layer requires kwarg 'hidden_dim'")
+            
+            self.layers.append(
+                    GATConv(input_dim, output_dim, kwargs['hidden_dim'])
+                )
+            
+            for _ in range(num_layers - 1):
+                self.layers.append(
+                    GATConv(output_dim, output_dim, kwargs['hidden_dim'])
+                )
+        elif layer == "MessagePassing":
+            if 'hidden_dim' not in kwargs.keys():
+                raise TypeError("MessagePassing layer requires kwarg 'hidden_dim'")
+            if 'num_hidden' not in kwargs.keys():
+                raise TypeError("MessagePassing layer requires kwarg 'num_hidden'")
+            if 'activation' not in kwargs.keys():
+                raise TypeError("MessagePassing layer requires kwarg 'activation'")
+            
+            self.layers.append(
+                    MessagePassing(input_dim, kwargs["hidden_dim"],
+                        kwargs["num_hidden"], output_dim, kwargs["activation"])
+                )
+            
+            for _ in range(num_layers - 1):
+                self.layers.append(
+                    MessagePassing(output_dim, kwargs["hidden_dim"],
+                        kwargs["num_hidden"], output_dim, kwargs["activation"])
+                )
+        else:
+            raise ValueError("Layer type not implemented")
+    
+    def forward(self, X: torch.Tensor, A: torch.Tensor) -> torch.Tensor:
+        """Forward pass of the GNN model
 
-    Args:
-        nn (_type_): _description_
-    """
-    ...
+        Args:
+            X (torch.Tensor): Input graph of shape [num_nodes, input_dim]
+            A (torch.Tensor): Adjacency matrix of shape [num_nodes, num_nodes]
+
+        Returns:
+            torch.Tensor: Output graph of shape [num_nodes, output_dim]
+        """
+        for layer in self.layers:
+            X = layer(X, A)
+        
+        return X
 
 class FP(nn.Module):
     """FingerPrint
@@ -158,16 +220,16 @@ class FCNN(nn.Module):
         self.layers.append(nn.Linear(hidden_dim, output_dim))
         self.layers.append(activation)
     
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, X: torch.Tensor) -> torch.Tensor:
         """Forward pass of the FCNN model
 
         Args:
-            x (torch.Tensor): Input tensor
+            X (torch.Tensor): Input tensor
 
         Returns:
             torch.Tensor: Output tensor
         """
         for layer in self.layers:
-            x = layer(x)
+            X = layer(X)
         
-        return x
+        return X
