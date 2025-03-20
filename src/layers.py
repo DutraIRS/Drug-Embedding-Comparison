@@ -104,12 +104,33 @@ class GATConv(nn.Module):
         return self.masked_attention(Q, K, V, A)
 
 class MessagePassing(nn.Module):
-    def __init__(self, input_dim, hidden_dim, num_hidden, output_dim, activation):
+    """Deep Message Passing Layer
+    """
+    def __init__(self, input_dim: int, hidden_dim: int, num_hidden: int,
+                    output_dim: int, activation: nn.Module):
+        """Initialize the MessagePassing layer
+
+        Args:
+            input_dim (int): Size of the input tensor.
+            hidden_dim (int): Size of the hidden layer(s).
+            num_hidden (int): Number of hidden layers.
+            output_dim (int): Size of the output tensor.
+            activation (nn.Module): Activation function for the output layer.
+        """
         super(MessagePassing, self).__init__()
         
         self.MLP = models.FCNN(input_dim, hidden_dim, num_hidden, output_dim, activation)
     
-    def forward(self, X, A):
+    def forward(self, X: torch.Tensor, A: torch.Tensor) -> torch.Tensor:
+        """Forward pass of the MessagePassing layer
+
+        Args:
+            X (torch.Tensor): Input graph of shape [num_nodes, input_dim]
+            A (torch.Tensor): Adjacency matrix of shape [num_nodes, num_nodes]
+
+        Returns:
+            torch.Tensor: Output graph of shape [num_nodes, output_dim]
+        """
         A += torch.eye(A.size()[0])
         
         return A @ self.MLP(X) # FCNN treats rows as independent datapoints in a batch
