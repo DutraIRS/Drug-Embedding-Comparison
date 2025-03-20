@@ -76,3 +76,99 @@ class TestGCNConv:
         n_params = sum(p.numel() for p in conv_layer.parameters())
         
         assert n_params == 4
+
+class TestGATConv:
+    def test_init(self):
+        """
+        Test the initialization of the GATConv layer
+        """
+        conv_layer = layers.GATConv(2, 2, 2)
+        
+        assert conv_layer is not None
+        assert isinstance(conv_layer, nn.Module)
+        assert isinstance(conv_layer, layers.GATConv)
+    
+    def test_number_of_parameters(self):
+        """
+        Test the number of trainable parameters in the layer
+        """
+        conv_layer = layers.GATConv(input_dim = 3, output_dim = 1, hidden_dim = 5)
+        
+        n_params = sum(p.numel() for p in conv_layer.parameters())
+        
+        assert n_params == 3*5 + 3*5 + 3*1
+    
+    def test_masked_attention(self):
+        """
+        Test the masked attention operation with mock tensors
+        """
+        eye = torch.eye(5)
+        
+        conv_layer = layers.GATConv(input_dim = 5, output_dim = 5, hidden_dim = 5)
+        
+        output = conv_layer.masked_attention(eye, eye, eye, eye)
+        
+        assert torch.all(output == torch.eye(5))
+    
+    def test_forward(self):
+        """
+        Test the forward pass of the layer
+        """
+        eye = torch.eye(3)
+        zeros = torch.zeros(3, 3)
+        
+        conv_layer = layers.GATConv(input_dim = 3, output_dim = 3, hidden_dim = 3)
+        
+        conv_layer.Wq = nn.Parameter(eye)
+        conv_layer.Wk = nn.Parameter(eye)
+        conv_layer.Wv = nn.Parameter(eye)
+        
+        output = conv_layer(eye, zeros)
+        
+        assert torch.all(output == eye)
+        
+    def test_output_dim_case_shrink(self):
+        """
+        Test the dimension of the output in the case of a shrinkage
+        """
+        tensor_identity_two = torch.Tensor([[1, 0], [0, 1]])
+        tensor_rectangular = torch.Tensor([[1.2, 1.5, -1.0, 9.1],
+                                            [0, 5.121, -4.001, 1]])
+        
+        conv_layer = layers.GATConv(input_dim = 4, output_dim = 2, hidden_dim = 3)
+        
+        output = conv_layer(tensor_rectangular, tensor_identity_two)
+        
+        assert isinstance(output, torch.Tensor)
+        assert output.size()[0] == 2
+        assert output.size()[1] == 2
+    
+    def test_output_dim_case_expand(self):
+        """
+        Test the dimension of the output in the case of an expansion
+        """
+        tensor_identity_two = torch.Tensor([[1, 0], [0, 1]])
+        
+        conv_layer = layers.GATConv(input_dim = 2, output_dim = 4, hidden_dim = 3)
+        
+        output = conv_layer(tensor_identity_two, tensor_identity_two)
+        
+        assert isinstance(output, torch.Tensor)
+        assert output.size()[0] == 2
+        assert output.size()[1] == 4
+    
+    def test_disconnected_graph(self):
+        """
+        Test if using a graph without links breaks the code
+        """
+        tensor_rectangular = torch.Tensor([[1.2, 1.5, -1.0, 9.1],
+                                            [0, 5.121, -4.001, 1]])
+        input_adjacency_matrix = torch.zeros(2, 2)
+        
+        conv_layer = layers.GATConv(input_dim = 4, output_dim = 1, hidden_dim = 3)
+        
+        output = conv_layer(tensor_rectangular, input_adjacency_matrix)
+        
+        assert isinstance(output, torch.Tensor)
+        assert output.size()[0] == 2
+        assert output.size()[1] == 1
