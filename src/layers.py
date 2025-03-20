@@ -1,8 +1,6 @@
 import torch
 import torch.nn as nn
 
-from src import models
-
 class GCNConv(nn.Module):
     """Graph Convolutional Network Convolution Layer
     """
@@ -33,8 +31,6 @@ class GCNConv(nn.Module):
         Returns:
             torch.Tensor: Output graph of shape [num_nodes, output_dim]
         """
-        A += torch.eye(A.size()[0])
-        
         D_tilde = torch.diag(A.sum(dim=0) ** (-1/2))
         A_tilde = D_tilde  @ A @ D_tilde
         X_tilde = A_tilde @ X @ self.W
@@ -95,8 +91,6 @@ class GATConv(nn.Module):
         Returns:
             torch.Tensor: Output graph of shape [num_nodes, output_dim]
         """
-        A += torch.eye(A.size()[0])
-        
         Q = X @ self.Wq
         K = X @ self.Wk
         V = X @ self.Wv
@@ -119,6 +113,8 @@ class MessagePassing(nn.Module):
         """
         super(MessagePassing, self).__init__()
         
+        from src import models # This is here to prevent circular import, sorry
+        
         self.MLP = models.FCNN(input_dim, hidden_dim, num_hidden, output_dim, activation)
     
     def forward(self, X: torch.Tensor, A: torch.Tensor) -> torch.Tensor:
@@ -131,6 +127,4 @@ class MessagePassing(nn.Module):
         Returns:
             torch.Tensor: Output graph of shape [num_nodes, output_dim]
         """
-        A += torch.eye(A.size()[0])
-        
         return A @ self.MLP(X) # FCNN treats rows as independent datapoints in a batch

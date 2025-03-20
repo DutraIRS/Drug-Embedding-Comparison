@@ -115,7 +115,6 @@ class TestGATConv:
         Test the forward pass of the layer
         """
         eye = torch.eye(3)
-        zeros = torch.zeros(3, 3)
         
         conv_layer = layers.GATConv(input_dim = 3, output_dim = 3, hidden_dim = 3)
         
@@ -123,7 +122,7 @@ class TestGATConv:
         conv_layer.Wk = nn.Parameter(eye)
         conv_layer.Wv = nn.Parameter(eye)
         
-        output = conv_layer(eye, zeros)
+        output = conv_layer(eye, eye)
         
         assert torch.all(output == eye)
         
@@ -189,14 +188,13 @@ class TestMessagePassing:
         Test the forward pass of the layer
         """
         eye = torch.eye(3)
-        zeros = torch.zeros(3, 3)
         
         mp_layer = layers.MessagePassing(input_dim=10, hidden_dim=5, num_hidden=2,
                                             output_dim=1, activation=nn.ReLU())
         
         mp_layer.MLP = nn.Identity()
         
-        output = mp_layer(eye, zeros)
+        output = mp_layer(eye, eye)
         
         assert torch.all(output == eye)
     
