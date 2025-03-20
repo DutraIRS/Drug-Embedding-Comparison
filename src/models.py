@@ -135,7 +135,7 @@ class FCNN(nn.Module):
     """Fully Connected Neural Network
     """
     def __init__(self, input_dim: int = 10, hidden_dim: int = 5, num_hidden: int = 2,
-                output_dim: int = 1, activation: nn.Modeule = nn.Identity()):
+                output_dim: int = 1, activation: nn.Module = nn.Identity()):
         """Initialize the FCNN model
 
         Args:
