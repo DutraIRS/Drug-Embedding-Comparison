@@ -40,10 +40,31 @@ class GCNConv(nn.Module):
         return self.activation(X_tilde)
 
 class GATConv(nn.Module):
-    def __init__(self):
+    def __init__(self, input_dim, output_dim, hidden_dim):
         super(GATConv, self).__init__()
         
-        ...
+        self.input_dim = input_dim
+        self.output_dim = output_dim
+        self.hidden_dim = hidden_dim
+        
+        # Initialize weights from a normal distribution with 0 mean and low variance
+        self.Wq = nn.Parameter(torch.randn([input_dim, hidden_dim]) / 10)
+        self.Wk = nn.Parameter(torch.randn([input_dim, hidden_dim]) / 10)
+        self.Wv = nn.Parameter(torch.randn([input_dim, output_dim]) / 10)
+    
+    def masked_attention(self, Q, K, V, A):
+        X = Q @ K.T
+        X = X + torch.nan_to_num(- torch.inf * (1 - A), nan=0) # Masking before softmax
+        X = torch.softmax(X, dim=1)
+        X = X @ V
+        
+        return X
     
     def forward(self, X, A):
-        ...
+        A += torch.eye(A.size()[0])
+        
+        Q = X @ self.Wq
+        K = X @ self.Wk
+        V = X @ self.Wv
+        
+        return self.masked_attention(Q, K, V, A)
