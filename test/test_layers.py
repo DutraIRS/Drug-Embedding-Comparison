@@ -172,3 +172,40 @@ class TestGATConv:
         assert isinstance(output, torch.Tensor)
         assert output.size()[0] == 2
         assert output.size()[1] == 1
+
+class TestMessagePassing:
+    def test_init(self):
+        """
+        Test the initialization of the MessagePassing layer
+        """
+        conv_layer = layers.MessagePassing(2, 2, 2, 2, nn.ReLU())
+        
+        assert conv_layer is not None
+        assert isinstance(conv_layer, nn.Module)
+        assert isinstance(conv_layer, layers.MessagePassing)
+    
+    def test_forward(self):
+        """
+        Test the forward pass of the layer
+        """
+        eye = torch.eye(3)
+        zeros = torch.zeros(3, 3)
+        
+        mp_layer = layers.MessagePassing(input_dim=10, hidden_dim=5, num_hidden=2,
+                                            output_dim=1, activation=nn.ReLU())
+        
+        mp_layer.MLP = nn.Identity()
+        
+        output = mp_layer(eye, zeros)
+        
+        assert torch.all(output == eye)
+    
+    def test_number_of_parameters(self):
+        """
+        Test the number of parameters in the MessagePassing layer
+        """
+        mp_layer = layers.MessagePassing(input_dim=10, hidden_dim=5, num_hidden=2,
+                                            output_dim=1, activation=nn.ReLU())
+        n_params = sum(p.numel() for p in mp_layer.parameters() if p.requires_grad)
+        
+        assert n_params == 11*5 + 6*5 + 6*1
