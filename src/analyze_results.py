@@ -16,12 +16,12 @@ MODEL_FOLDER = "./saved_models/"
 DIAGNOSTICS_FOLDER = "./diagnostics/"
 OUTPUT_FILE = DIAGNOSTICS_FOLDER + "best_configs.csv"
 
-def collect_all_results():
+def collect_all_results() -> pd.DataFrame:
     """
     Scan all model directories and collect specifications
     
     Returns:
-        pd.DataFrame: DataFrame with all model specifications
+        DataFrame with all model specifications and performance metrics
     """
     all_results = []
     
@@ -68,15 +68,15 @@ def collect_all_results():
     
     return pd.DataFrame(all_results)
 
-def find_best_configs(df):
+def find_best_configs(df: pd.DataFrame) -> pd.DataFrame:
     """
     Find the best configuration for each model type (lowest mean validation loss)
     
     Args:
-        df (pd.DataFrame): DataFrame with all results
+        df: DataFrame with all results
     
     Returns:
-        pd.DataFrame: DataFrame with best configuration for each model type
+        DataFrame with best configuration for each model type, sorted by performance
     """
     # Group by model type and find the one with minimum mean validation loss
     # Use mean_val_loss if available, otherwise fall back to best_val_loss
@@ -88,13 +88,13 @@ def find_best_configs(df):
     
     return best_configs
 
-def create_visualizations(df, best_configs):
+def create_visualizations(df: pd.DataFrame, best_configs: pd.DataFrame) -> None:
     """
     Create comparison visualizations
     
     Args:
-        df (pd.DataFrame): DataFrame with all results
-        best_configs (pd.DataFrame): DataFrame with best configurations
+        df: DataFrame with all results
+        best_configs: DataFrame with best configurations
     """
     # Create output directory for plots
     plot_dir = Path(DIAGNOSTICS_FOLDER) / "analysis_plots"
@@ -198,6 +198,16 @@ def print_summary(df, best_configs):
     print(best_configs[display_cols].to_string(index=False))
     
     print("\n" + "-"*80)
+
+
+def print_summary(df: pd.DataFrame, best_configs: pd.DataFrame) -> None:
+    """
+    Print summary of all results and best configurations
+    
+    Args:
+        df: DataFrame with all training results
+        best_configs: DataFrame with best configuration per model type
+    """
     print("OVERALL STATISTICS")
     print("-"*80)
     print(f"Best overall model: {best_configs.iloc[0]['model_name']}")
@@ -206,9 +216,12 @@ def print_summary(df, best_configs):
     print(f"Std validation loss: {df['best_val_loss'].std():.6f}")
     print("="*80 + "\n")
 
-def main():
+def main() -> None:
     """
     Main function to analyze all results
+    
+    Parses command-line arguments, collects results from trained models,
+    finds best configurations, creates visualizations, and saves outputs.
     """
     # Parse command line arguments
     parser = argparse.ArgumentParser(description='Analyze training results')

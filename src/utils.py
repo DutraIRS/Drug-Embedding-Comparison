@@ -83,7 +83,20 @@ class WeightedBCELoss(nn.Module):
         return bce
 
 class DrugSideEffectsDataset(Dataset):
-    def __init__(self, smiles, side_effects_data, task="regression"):        
+    """Dataset for drug-side effect prediction from molecular graphs
+    
+    Converts SMILES strings to molecular graphs with node features and adjacency matrices.
+    Supports both regression (predicting 0-5 scores) and classification (binary prediction) tasks.
+    """
+    
+    def __init__(self, smiles: list[str], side_effects_data: torch.Tensor | np.ndarray, task: str = "regression"):
+        """Initialize the dataset
+        
+        Args:
+            smiles: List of SMILES strings representing molecules
+            side_effects_data: Target values (scores or binary labels)
+            task: Task type - "regression" or "classification"
+        """
         self.smiles = smiles
         self.task = task
         
@@ -112,17 +125,34 @@ class DrugSideEffectsDataset(Dataset):
         
         self.data = [self.build_graph(smiles) for smiles in self.smiles]
     
-    def __len__(self):
+    def __len__(self) -> int:
+        """Return the number of molecules in the dataset"""
         return len(self.smiles)
     
-    def __getitem__(self, idx):
+    def __getitem__(self, idx: int) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, str]:
+        """Get a molecule and its side effect data
+        
+        Args:
+            idx: Index of the molecule
+            
+        Returns:
+            Tuple of (node_features, adjacency_matrix, side_effects, smiles_string)
+        """
         X, A = self.data[idx]
         y = self.side_effects_data[idx, :]
         smiles = self.smiles[idx]
         
         return X, A, y, smiles
     
-    def build_graph(self, smiles: str) -> torch.Tensor:
+    def build_graph(self, smiles: str) -> tuple[torch.Tensor, torch.Tensor]:
+        """Convert SMILES string to graph representation
+        
+        Args:
+            smiles: SMILES string of the molecule
+            
+        Returns:
+            Tuple of (node_features, adjacency_matrix)
+        """
         mol = Chem.MolFromSmiles(smiles)
         
         X = self.get_atom_features(mol)
@@ -131,6 +161,14 @@ class DrugSideEffectsDataset(Dataset):
         return X, A
     
     def get_adjacency_matrix(self, mol: Chem.Mol) -> torch.Tensor:
+        """Build adjacency matrix from molecular bonds
+        
+        Args:
+            mol: RDKit molecule object
+            
+        Returns:
+            Adjacency matrix with self-loops (identity + bonds)
+        """
         num_atoms = mol.GetNumAtoms()
 
         A = torch.eye(num_atoms)
@@ -145,6 +183,14 @@ class DrugSideEffectsDataset(Dataset):
         return A
 
     def get_atom_features(self, mol: Chem.Mol) -> torch.Tensor:
+        """Extract one-hot encoded atom features
+        
+        Args:
+            mol: RDKit molecule object
+            
+        Returns:
+            One-hot encoded atomic features [num_atoms, num_atom_types]
+        """
         num_atoms = mol.GetNumAtoms()
 
         X = torch.zeros(num_atoms, self.num_different_atoms)
@@ -154,12 +200,30 @@ class DrugSideEffectsDataset(Dataset):
 
         return X
     
-    def collate_fn(self, batch):
+    def collate_fn(self, batch: list) -> tuple:
+        """Custom collate function for batching variable-size graphs
+        
+        Args:
+            batch: List of (X, A, y, smiles) tuples
+            
+        Returns:
+            Tuple of lists for (X, A, y, smiles)
+        """
         X, A, y, smiles = zip(*batch)
         
         return X, A, y, smiles
 
 def train_val_test_split(len_dataset: int, val_ratio: float, test_ratio: float) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Split dataset indices into train/validation/test sets
+    
+    Args:
+        len_dataset: Total number of samples in dataset
+        val_ratio: Fraction of data for validation
+        test_ratio: Fraction of data for testing
+        
+    Returns:
+        Tuple of (train_indices, val_indices, test_indices)
+    """
     indices = np.arange(len_dataset)
     np.random.shuffle(indices)
     
@@ -172,7 +236,20 @@ def train_val_test_split(len_dataset: int, val_ratio: float, test_ratio: float) 
     
     return train_indices, val_indices, test_indices
 
-def get_loaders(path, val_ratio, test_ratio, batch_size, task="regression"):
+def get_loaders(path: str, val_ratio: float, test_ratio: float, batch_size: int, 
+                task: str = "regression") -> tuple[DataLoader, DataLoader, DataLoader]:
+    """Create data loaders for training, validation, and testing
+    
+    Args:
+        path: Path to CSV file with SMILES and side effect data
+        val_ratio: Fraction of data for validation
+        test_ratio: Fraction of data for testing
+        batch_size: Batch size for data loaders
+        task: Task type - "regression" or "classification"
+        
+    Returns:
+        Tuple of (train_loader, val_loader, test_loader)
+    """
     df = pd.read_csv(path, header=None, sep=';')
     
     smiles = list(df.iloc[:, 0].values)
@@ -203,7 +280,14 @@ def get_loaders(path, val_ratio, test_ratio, batch_size, task="regression"):
     return train_loader, val_loader, test_loader
 
 
-def save_model(name: str, model: torch.nn.Module, task: str = "regression"):
+def save_model(name: str, model: nn.Module, task: str = "regression") -> None:
+    """Save model weights to disk
+    
+    Args:
+        name: Model name (used as subdirectory name)
+        model: PyTorch model to save
+        task: Task type for directory organization - "regression" or "classification"
+    """
     folder_path = os.path.join(MODEL_FOLDER, task, name)
     if not os.path.exists(folder_path):
         os.makedirs(folder_path)
@@ -215,37 +299,55 @@ def save_model(name: str, model: torch.nn.Module, task: str = "regression"):
     print(f"Model saved to {folder_path}")
 
 def save_losses(name: str, train_losses: list[float], val_losses: list[float] = None, task: str = "regression"):
+    """
+    Save losses to CSV and generate training curves plot
+    
+    Args:
+        name: Model name
+        train_losses: List of training losses per epoch
+        val_losses: List of validation losses per epoch (optional)
+        task: Task type ('regression' or 'classification')
+    """
     folder_path = os.path.join(MODEL_FOLDER, task, name)
     if not os.path.exists(folder_path):
         os.makedirs(folder_path)
     
-    # Save losses
+    # Save losses to CSV
     losses_path = os.path.join(folder_path, 'losses.csv')
-    if val_losses is None or len(val_losses) == 0:
-        losses_df = pd.DataFrame({'train_losses': train_losses})
-    else:
-        losses_df = pd.DataFrame({'train_losses': train_losses, 'val_losses': val_losses})
+    data_dict = {'train_losses': train_losses}
+    
+    if val_losses is not None and len(val_losses) > 0:
+        data_dict['val_losses'] = val_losses
+    
+    losses_df = pd.DataFrame(data_dict)
     losses_df.to_csv(losses_path, index=False)
 
-    # Plot losses and save fig
+    # Plot only train and validation losses
     plt.figure(figsize=(10, 6))
-    plt.plot(train_losses, label='Train Loss')
+    plt.plot(train_losses, label='Train Loss', linewidth=2, color='tab:blue')
     if val_losses and len(val_losses) > 0:
-        plt.plot(val_losses, label='Validation Loss')
-    plt.xlabel('Epochs')
-    plt.ylabel('Loss')
-    plt.title('Training and Validation Loss')
-    plt.legend()
-    plt.grid(True)
-
-    # Save the plot
+        plt.plot(val_losses, label='Validation Loss', linewidth=2, color='tab:orange')
+    plt.xlabel('Epochs', fontsize=12)
+    plt.ylabel('Loss', fontsize=12)
+    plt.title('Training and Validation Loss', fontsize=14)
+    plt.legend(fontsize=10)
+    plt.grid(True, alpha=0.3)
+    plt.tight_layout()
+    
     plot_path = os.path.join(folder_path, 'loss_plot.png')
-    plt.savefig(plot_path)
+    plt.savefig(plot_path, dpi=150)
     plt.close()
     
     print(f"Losses saved to {folder_path}")
 
-def save_specs(name: str, specs: dict, task: str = "regression"):
+def save_specs(name: str, specs: dict, task: str = "regression") -> None:
+    """Save model specifications to CSV file
+    
+    Args:
+        name: Model name (used as subdirectory name)
+        specs: Dictionary of model specifications and hyperparameters
+        task: Task type for directory organization - "regression" or "classification"
+    """
     folder_path = os.path.join(MODEL_FOLDER, task, name)
     if not os.path.exists(folder_path):
         os.makedirs(folder_path)
@@ -254,7 +356,17 @@ def save_specs(name: str, specs: dict, task: str = "regression"):
     df.index.name = 'specification'
     df.to_csv(os.path.join(folder_path, 'specs.csv'))
 
-def save_preds_kde(model, model_name, loader, model_type=None, task="regression"):
+def save_preds_kde(model: nn.Module, model_name: str, loader: DataLoader, 
+                   model_type: str = None, task: str = "regression") -> None:
+    """Generate KDE plots of predicted side effect frequencies
+    
+    Args:
+        model: Trained PyTorch model
+        model_name: Name of the model (for loading weights and saving plot)
+        loader: DataLoader for generating predictions
+        model_type: Type of model ("VAE", "FP", etc.) - determines preprocessing
+        task: Task type for directory organization - "regression" or "classification"
+    """
     model.load_state_dict(torch.load(os.path.join(MODEL_FOLDER, task, model_name, 'model_weights.pt')))
     
     model.eval() # freeze learning

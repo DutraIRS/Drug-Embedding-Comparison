@@ -27,18 +27,20 @@ src/
 ├── utils.py           # Data loading, loss functions, saving utilities
 ├── train.py           # Grid search training with 3 runs per configuration
 ├── analyze_results.py # Consolidate results and find best configurations
-└── test.py            # Final evaluation on test set with 5 runs per model
+├── test.py            # Final evaluation on test set with 5 runs per model
+└── trim_data.ipynb    # Notebook for data preprocessing and subset creation
 
 test/
-├── test_layers.py     # Unit tests for GNN layers
-├── test_models.py     # Unit tests for model architectures
-├── test_utils.py      # Unit tests for utilities
-├── test_loss.py       # Unit tests for loss functions
-└── test_metrics.py    # Unit tests for evaluation metrics (AUROC, RMSE)
+├── test_layers.py          # Unit tests for GNN layers
+├── test_models.py          # Unit tests for model architectures
+├── test_utils.py           # Unit tests for utilities
+├── test_loss.py            # Unit tests for loss functions
+├── test_train.py           # Unit tests for training pipeline
+└── test_analyze_results.py # Unit tests for results analysis
 
 data/
 ├── R.csv              # Full dataset (molecules × side effects)
-├── R_100.csv          # Subset for quick experiments (100 samples)
+├── R_100.csv          # Subset for quick experiments (samples with less than 100 atoms)
 ├── smiles.csv         # SMILES strings for full dataset
 └── smiles_100.csv     # SMILES strings for subset
 
@@ -191,9 +193,9 @@ python src/train.py --task classification
 - **FCNN**: num_layers, hidden_dim
 
 **Training Configuration:**
-- Dataset: `data/R_100.csv` (100 samples)
+- Dataset: `data/R_100.csv` (samples with less than 100 atoms)
 - Split: 60% train / 20% val / 20% test
-- Epochs: 2 (configurable via `EPOCHS` variable)
+- Epochs: 1_000 (configurable via `EPOCHS` variable)
 - Runs per config: 3 (configurable via `N_RUNS`)
 - Device: CUDA if available, else CPU
 - **Task-specific loss**:
@@ -256,11 +258,13 @@ pytest --cov=src --cov-report=term-missing --cov-report=html
 ```
 
 **Test Coverage:**
-- Core modules: `layers.py` (100%), `models.py` (86%)
-- **76 tests** covering:
-  - Model architectures and GNN layers (47 tests)
-  - Loss functions - DataDrivenLoss and WeightedBCELoss (18 tests)
-  - Evaluation metrics - AUROC and RMSE (11 tests)
+- Core modules: `layers.py` (100%), `models.py` (88%), `analyze_results.py` (41%), `utils.py` (50%)
+- **65 tests** covering:
+  - Model architectures and GNN layers (25 tests)
+  - Loss functions - DataDrivenLoss and WeightedBCELoss (20 tests)
+  - Training pipeline and utilities (11 tests)
+  - Results analysis (9 tests)
+- Overall coverage: 32%
 - HTML coverage report: `htmlcov/index.html`
 
 ## Model Architecture Details
@@ -296,7 +300,7 @@ pytest --cov=src --cov-report=term-missing --cov-report=html
 ## Data Format
 - **Input**: Molecular graphs
   - SMILES strings → RDKit molecular objects
-  - Atomic features: one-hot encoded atom types (100 possible)
+  - Atomic features: one-hot encoded atom types
   - Adjacency matrix: binary connectivity
 - **Output**: 994-dimensional vector
   - **Regression**: Side effect frequencies (0-5 scale)
@@ -316,7 +320,7 @@ pytest --cov=src --cov-report=term-missing --cov-report=html
   - Reports: mean ± std validation loss
   - Selects best config based on **mean** validation loss
 - **Testing**: 5 runs per best model
-  - Reports: mean ± std test loss and RMSE
+  - Reports: mean ± std test loss and task-specific metric (RMSE or AUROC)
   - Provides confidence intervals for model comparison
 
 ### No Early Stopping

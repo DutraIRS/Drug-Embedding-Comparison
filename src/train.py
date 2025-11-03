@@ -29,8 +29,8 @@ FILE_PATH = './data/R_100.csv'
 VAL_RATIO = 0.2
 TEST_RATIO = 0.2
 BATCH_SIZE = 64
-EPOCHS = 2
-N_RUNS = 3  # Number of times to run each configuration
+EPOCHS = 1_000
+N_RUNS = 3
 
 ### SETUP ###
 device = (
@@ -54,10 +54,6 @@ input_dim = sample_X.size(1)
 general_configs = {
     'learning_rates': [1e-5, 1e-4],
     'weight_decays': [1e-6, 1e-4],
-}
-general_configs = {
-    'learning_rates': [1e-5],
-    'weight_decays': [1e-6],
 }
 
 # Model-specific hyperparameters
@@ -95,51 +91,20 @@ model_specific_configs = {
     }
 }
 
-model_specific_configs = {
-    'VAE': {
-        'latent_dim': [8],
-        'hidden_dim': [64],
-        'reconstruction_beta': [0.01]
-    },
-    'GCN': {
-        'num_layers': [3],
-    },
-    'GAT': {
-        'num_layers': [3],
-        'hidden_dim': [64],
-    },
-    'MPNN': {
-        'num_layers': [3],
-        'hidden_dim': [64],
-        'num_hidden': [2]
-    },
-    'Transformer': {
-        'num_layers': [3],
-        'd_model': [64],
-        'nhead': [4],
-        'dim_feedforward': [256]
-    },
-    'FP': {
-        'radius': [2],
-        'n_bits': [1024]
-    },
-    'FCNN': {
-        'num_layers': [3],
-        'hidden_dim': [64]
-    }
-}
-
-def create_model(model_type, config, input_dim, output_dim=994):
+def create_model(model_type: str, config: dict, input_dim: int, output_dim: int = 994) -> tuple[nn.Module, float | None]:
     """Factory function to create models with specific configurations
     
     Args:
-        model_type (str): Type of model to create
-        config (dict): Model-specific configuration
-        input_dim (int): Input dimension
-        output_dim (int): Output dimension
+        model_type: Type of model to create ("VAE", "GCN", "GAT", etc.)
+        config: Model-specific configuration parameters
+        input_dim: Input dimension (number of atom features)
+        output_dim: Output dimension (number of side effects)
     
     Returns:
-        tuple: (model, reconstruction_beta or None)
+        Tuple of (model, reconstruction_beta) where reconstruction_beta is None for non-VAE models
+        
+    Raises:
+        ValueError: If model_type is not recognized
     """
     reconstruction_beta = None
     
@@ -210,17 +175,17 @@ def create_model(model_type, config, input_dim, output_dim=994):
     
     return model, reconstruction_beta
 
-def get_model_name(model_type, config, lr, wd):
+def get_model_name(model_type: str, config: dict, lr: float, wd: float) -> str:
     """Generate descriptive model name with all hyperparameters
     
     Args:
-        model_type (str): Type of model
-        config (dict): Model-specific configuration
-        lr (float): Learning rate
-        wd (float): Weight decay
+        model_type: Type of model ("VAE", "GCN", etc.)
+        config: Model-specific configuration parameters
+        lr: Learning rate
+        wd: Weight decay
     
     Returns:
-        str: Descriptive model name
+        Descriptive model name string with hyperparameters
     """
     parts = [model_type]
     
@@ -417,10 +382,11 @@ for model_type in model_types:
                             val_metrics.append(epoch_metric)
                             metric_name = "RMSE"
                         
-                        print(f"  Epoch {epoch+1}/{EPOCHS} - "
-                              f"Train Loss: {epoch_train_loss:.4f} - "
-                              f"Val Loss: {epoch_val_loss:.4f} - "
-                              f"Val {metric_name}: {epoch_metric:.4f}")
+                        if epoch % 100 == 0 or epoch == EPOCHS - 1:
+                            print(f"  Epoch {epoch+1}/{EPOCHS} - "
+                                f"Train Loss: {epoch_train_loss:.8f} - "
+                                f"Val Loss: {epoch_val_loss:.8f} - "
+                                f"Val {metric_name}: {epoch_metric:.8f}")
                     
                     # Save final model (after all epochs)
                     save_model(model_name, model, task=TASK)

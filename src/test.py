@@ -32,7 +32,7 @@ FILE_PATH = './data/R_100.csv'
 VAL_RATIO = 0.2
 TEST_RATIO = 0.2
 BATCH_SIZE = 64
-EPOCHS = 2
+EPOCHS = 1_000
 N_TEST_RUNS = 5
 
 ### SETUP ###
@@ -77,16 +77,19 @@ print(f"\nDataset sizes:")
 print(f"  Train+Val: {len(train_val_dataset)} samples")
 print(f"  Test: {len(test_loader.dataset)} samples")
 
-def create_model_from_config(row, input_dim, output_dim=994):
+def create_model_from_config(row: pd.Series, input_dim: int, output_dim: int = 994) -> tuple[nn.Module, float | None]:
     """Create model from best config row
     
     Args:
         row: DataFrame row with model configuration
-        input_dim (int): Input dimension
-        output_dim (int): Output dimension
+        input_dim: Input dimension (number of atom features)
+        output_dim: Output dimension (number of side effects)
     
     Returns:
-        tuple: (model, reconstruction_beta or None)
+        Tuple of (model, reconstruction_beta) where reconstruction_beta is None for non-VAE models
+        
+    Raises:
+        ValueError: If model_type is not recognized
     """
     model_type = row['model_type']
     reconstruction_beta = None
