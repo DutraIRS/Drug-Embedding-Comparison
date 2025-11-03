@@ -344,7 +344,7 @@ for idx, row in best_configs.iterrows():
             })
             
             # Save this run's model and results
-            save_losses(model_name, train_losses)
+            save_losses(model_name, train_losses, task=TASK)
             
             specs = {
                 'model_name': model_name,
@@ -367,11 +367,11 @@ for idx, row in best_configs.iterrows():
                     if col in row and pd.notna(row[col]):
                         specs[col] = row[col]
             
-            save_specs(model_name, specs)
+            save_specs(model_name, specs, task=TASK)
             
             # Save KDE plot for first run only
             if test_run_idx == 0:
-                save_preds_kde(model, model_name, test_loader, model_type=model_type)
+                save_preds_kde(model, model_name, test_loader, model_type=model_type, task=TASK)
     
     # Calculate statistics across test runs
     test_losses_all_runs = [r['test_loss'] for r in test_run_results]
