@@ -10,16 +10,10 @@ import seaborn as sns
 import argparse
 from pathlib import Path
 
-### PARSE COMMAND LINE ARGUMENTS ###
-parser = argparse.ArgumentParser(description='Analyze training results')
-parser.add_argument('--task', type=str, default='regression', 
-                    choices=['regression', 'classification'],
-                    help='Task type: regression or classification')
-args = parser.parse_args()
-
-TASK = args.task
-MODEL_FOLDER = f"./saved_models/{TASK}/"
-DIAGNOSTICS_FOLDER = f"./diagnostics/{TASK}/"
+# Default values
+DEFAULT_TASK = "regression"
+MODEL_FOLDER = "./saved_models/"
+DIAGNOSTICS_FOLDER = "./diagnostics/"
 OUTPUT_FILE = DIAGNOSTICS_FOLDER + "best_configs.csv"
 
 def collect_all_results():
@@ -216,7 +210,22 @@ def main():
     """
     Main function to analyze all results
     """
-    print(f"Task: {TASK}")
+    # Parse command line arguments
+    parser = argparse.ArgumentParser(description='Analyze training results')
+    parser.add_argument('--task', type=str, default='regression', 
+                        choices=['regression', 'classification'],
+                        help='Task type: regression or classification')
+    args = parser.parse_args()
+    
+    task = args.task
+    
+    # Update paths based on task
+    global MODEL_FOLDER, DIAGNOSTICS_FOLDER, OUTPUT_FILE
+    MODEL_FOLDER = f"./saved_models/{task}/"
+    DIAGNOSTICS_FOLDER = f"./diagnostics/{task}/"
+    OUTPUT_FILE = DIAGNOSTICS_FOLDER + "best_configs.csv"
+    
+    print(f"Task: {task}")
     print(f"Collecting results from all trained models in {MODEL_FOLDER}...")
     df = collect_all_results()
     
