@@ -160,3 +160,8 @@ cython_debug/
 #.idea/
 *.docx
 /tcc-env
+
+# Project-specific
+saved_models/
+diagnostics/
+papers/
