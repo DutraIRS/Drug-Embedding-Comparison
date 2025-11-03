@@ -8,6 +8,10 @@ from src import layers
 import torch
 import torch.nn as nn
 
+# Force CPU for tests to avoid CUDA/CPU device mismatch
+device = "cpu"
+torch.set_default_device(device)
+
 class TestGCNConv:
     def test_init(self):
         """
@@ -23,11 +27,11 @@ class TestGCNConv:
         """
         Test the dimension of the output in the case of a shrinkage
         """
-        tensor_identity_two = torch.Tensor([[1, 0], [0, 1]])
+        tensor_identity_two = torch.Tensor([[1, 0], [0, 1]]).to(device)
         tensor_rectangular = torch.Tensor([[1.2, 1.5, -1.0, 9.1],
-                                            [0, 5.121, -4.001, 1]])
-        
-        conv_layer = layers.GCNConv(input_dim = 4, output_dim = 2, activation = nn.ReLU())
+                                            [0, 5.121, -4.001, 1]]).to(device)
+
+        conv_layer = layers.GCNConv(input_dim = 4, output_dim = 2, activation = nn.ReLU()).to(device)
         
         output = conv_layer(tensor_rectangular, tensor_identity_two)
         
@@ -40,9 +44,9 @@ class TestGCNConv:
         """
         Test the dimension of the output in the case of an expansion
         """
-        tensor_identity_two = torch.Tensor([[1, 0], [0, 1]])
-        
-        conv_layer = layers.GCNConv(input_dim = 2, output_dim = 4, activation = nn.ReLU())
+        tensor_identity_two = torch.Tensor([[1, 0], [0, 1]]).to(device)
+
+        conv_layer = layers.GCNConv(input_dim = 2, output_dim = 4, activation = nn.ReLU()).to(device)
         
         output = conv_layer(tensor_identity_two, tensor_identity_two)
         
@@ -56,10 +60,10 @@ class TestGCNConv:
         Test if using a graph without links breaks the code
         """
         tensor_rectangular = torch.Tensor([[1.2, 1.5, -1.0, 9.1],
-                                            [0, 5.121, -4.001, 1]])
-        input_adjacency_matrix = torch.zeros(2, 2)
-        
-        conv_layer = layers.GCNConv(input_dim = 4, output_dim = 1)
+                                            [0, 5.121, -4.001, 1]]).to(device)
+        input_adjacency_matrix = torch.zeros(2, 2).to(device)
+
+        conv_layer = layers.GCNConv(input_dim = 4, output_dim = 1).to(device)
         
         output = conv_layer(tensor_rectangular, input_adjacency_matrix)
         
@@ -130,11 +134,11 @@ class TestGATConv:
         """
         Test the dimension of the output in the case of a shrinkage
         """
-        tensor_identity_two = torch.Tensor([[1, 0], [0, 1]])
+        tensor_identity_two = torch.Tensor([[1, 0], [0, 1]]).to(device)
         tensor_rectangular = torch.Tensor([[1.2, 1.5, -1.0, 9.1],
-                                            [0, 5.121, -4.001, 1]])
-        
-        conv_layer = layers.GATConv(input_dim = 4, output_dim = 2, hidden_dim = 3)
+                                            [0, 5.121, -4.001, 1]]).to(device)
+
+        conv_layer = layers.GATConv(input_dim = 4, output_dim = 2, hidden_dim = 3).to(device)
         
         output = conv_layer(tensor_rectangular, tensor_identity_two)
         
@@ -146,9 +150,9 @@ class TestGATConv:
         """
         Test the dimension of the output in the case of an expansion
         """
-        tensor_identity_two = torch.Tensor([[1, 0], [0, 1]])
-        
-        conv_layer = layers.GATConv(input_dim = 2, output_dim = 4, hidden_dim = 3)
+        tensor_identity_two = torch.Tensor([[1, 0], [0, 1]]).to(device)
+
+        conv_layer = layers.GATConv(input_dim = 2, output_dim = 4, hidden_dim = 3).to(device)
         
         output = conv_layer(tensor_identity_two, tensor_identity_two)
         
@@ -161,10 +165,10 @@ class TestGATConv:
         Test if using a graph without links breaks the code
         """
         tensor_rectangular = torch.Tensor([[1.2, 1.5, -1.0, 9.1],
-                                            [0, 5.121, -4.001, 1]])
-        input_adjacency_matrix = torch.zeros(2, 2)
-        
-        conv_layer = layers.GATConv(input_dim = 4, output_dim = 1, hidden_dim = 3)
+                                            [0, 5.121, -4.001, 1]]).to(device)
+        input_adjacency_matrix = torch.zeros(2, 2).to(device)
+
+        conv_layer = layers.GATConv(input_dim = 4, output_dim = 1, hidden_dim = 3).to(device)
         
         output = conv_layer(tensor_rectangular, input_adjacency_matrix)
         
