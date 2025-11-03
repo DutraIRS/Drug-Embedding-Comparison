@@ -7,10 +7,19 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
+import argparse
 from pathlib import Path
 
-MODEL_FOLDER = "./saved_models/"
-DIAGNOSTICS_FOLDER = "./diagnostics/"
+### PARSE COMMAND LINE ARGUMENTS ###
+parser = argparse.ArgumentParser(description='Analyze training results')
+parser.add_argument('--task', type=str, default='regression', 
+                    choices=['regression', 'classification'],
+                    help='Task type: regression or classification')
+args = parser.parse_args()
+
+TASK = args.task
+MODEL_FOLDER = f"./saved_models/{TASK}/"
+DIAGNOSTICS_FOLDER = f"./diagnostics/{TASK}/"
 OUTPUT_FILE = DIAGNOSTICS_FOLDER + "best_configs.csv"
 
 def collect_all_results():
@@ -207,11 +216,12 @@ def main():
     """
     Main function to analyze all results
     """
-    print("Collecting results from all trained models...")
+    print(f"Task: {TASK}")
+    print(f"Collecting results from all trained models in {MODEL_FOLDER}...")
     df = collect_all_results()
     
     if df.empty:
-        print("No results found. Make sure models have been trained and saved.")
+        print(f"No results found in {MODEL_FOLDER}. Make sure models have been trained and saved.")
         return
     
     print(f"Found {len(df)} trained models.")

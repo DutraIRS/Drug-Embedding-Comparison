@@ -423,10 +423,10 @@ for model_type in model_types:
                               f"Val {metric_name}: {epoch_metric:.4f}")
                     
                     # Save final model (after all epochs)
-                    save_model(model_name, model)
+                    save_model(model_name, model, task=TASK)
                     
                     # Save and plot losses (after all epochs)
-                    save_losses(model_name, train_losses, val_losses)
+                    save_losses(model_name, train_losses, val_losses, task=TASK)
                     
                     # Save model architecture (after training)
                     with torch.no_grad():
@@ -458,10 +458,10 @@ for model_type in model_types:
                     # Add model-specific hyperparameters to specs
                     specs.update(config)
                     
-                    save_specs(model_name, specs)
+                    save_specs(model_name, specs, task=TASK)
                     
                     # Save KDE predictions for this run
-                    save_preds_kde(model, model_name, val_loader, model_type=model_type)
+                    save_preds_kde(model, model_name, val_loader, model_type=model_type, task=TASK)
                     
                     # Store result for this run
                     run_results.append({
@@ -511,6 +511,6 @@ for model_type in model_types:
             summary_specs.update(config)
             
             # Save summary specs
-            save_specs(summary_model_name, summary_specs)
+            save_specs(summary_model_name, summary_specs, task=TASK)
             
             print(f'\n{"="*5} Configuration {base_model_name} complete ({N_RUNS} runs)! {"="*5}\n')

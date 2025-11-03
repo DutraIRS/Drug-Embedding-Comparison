@@ -46,11 +46,11 @@ print(f"Using device: {device}")
 print(f"Task: {TASK}")
 
 # Load best configurations
-best_configs_path = './diagnostics/best_configs.csv'
+best_configs_path = f'./diagnostics/{TASK}/best_configs.csv'
 if not os.path.exists(best_configs_path):
     raise FileNotFoundError(
         f"Best configs file not found at {best_configs_path}. "
-        "Please run analyze_results.py first to generate best_configs.csv"
+        f"Please run analyze_results.py --task {TASK} first to generate best_configs.csv"
     )
 
 best_configs = pd.read_csv(best_configs_path)
@@ -261,7 +261,7 @@ for idx, row in best_configs.iterrows():
         train_end_time = time.time()
         train_time = train_end_time - train_start_time
         
-        save_model(model_name, model)
+        save_model(model_name, model, task=TASK)
         last_train_loss = train_losses[-1]
         print(f"\nTraining complete! Last train loss: {last_train_loss:.4f}, Time: {train_time:.2f}s")
         
@@ -420,13 +420,13 @@ print("="*60)
 print(results_df.to_string(index=False))
 
 # Save results to CSV
-os.makedirs('./diagnostics', exist_ok=True)
-results_path = './diagnostics/final_test_results.csv'
+os.makedirs(f'./diagnostics/{TASK}', exist_ok=True)
+results_path = f'./diagnostics/{TASK}/final_test_results.csv'
 results_df.to_csv(results_path, index=False)
 print(f"\nResults saved to: {results_path}")
 
 # Create visualizations
-vis_dir = './diagnostics/final_test_plots'
+vis_dir = f'./diagnostics/{TASK}/final_test_plots'
 os.makedirs(vis_dir, exist_ok=True)
 
 # 1. Test loss comparison with error bars

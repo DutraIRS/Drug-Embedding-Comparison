@@ -42,27 +42,51 @@ data/
 ├── smiles.csv         # SMILES strings for full dataset
 └── smiles_100.csv     # SMILES strings for subset
 
-saved_models/          # Trained model checkpoints
-└── [model_name]/      # Individual model directories
-    ├── model_weights.pt      # Model state dict
-    ├── specs.json            # Hyperparameters and architecture
-    ├── losses.png            # Training curves
-    └── kde_plot.png          # Prediction distribution
+saved_models/          # Trained model checkpoints (organized by task)
+├── regression/        # Regression task models
+│   └── [model_name]/
+│       ├── model_weights.pt      # Model state dict
+│       ├── specs.csv             # Hyperparameters and architecture
+│       ├── losses.csv            # Training history
+│       ├── loss_plot.png         # Training curves
+│       └── kde_plot.png          # Prediction distribution
+└── classification/    # Classification task models
+    └── [model_name]/
+        ├── model_weights.pt      # Model state dict
+        ├── specs.csv             # Hyperparameters and architecture
+        ├── losses.csv            # Training history
+        ├── loss_plot.png         # Training curves
+        └── kde_plot.png          # Prediction distribution
 
-diagnostics/           # Analysis results and visualizations
-├── all_results.csv    # All training configurations and results
-├── best_configs.csv   # Best configuration per model type
-├── final_test_results.csv  # Test set evaluation results
-├── analysis_plots/    # Training analysis visualizations
-│   ├── validation_loss_boxplot.png
-│   ├── best_configs_comparison.png
-│   ├── complexity_vs_performance.png
-│   └── hyperparameter_heatmaps.png
-└── final_test_plots/  # Test set evaluation visualizations
-    ├── test_loss_comparison.png
-    ├── all_metrics_comparison.png
-    ├── parameters_vs_performance.png
-    └── training_time_comparison.png
+diagnostics/           # Analysis results and visualizations (organized by task)
+├── regression/        # Regression task diagnostics
+│   ├── all_results.csv           # All training configurations and results
+│   ├── best_configs.csv          # Best configuration per model type
+│   ├── final_test_results.csv    # Test set evaluation results
+│   ├── analysis_plots/           # Training analysis visualizations
+│   │   ├── val_loss_by_model_type.png
+│   │   ├── best_configs_comparison.png
+│   │   ├── params_vs_loss.png
+│   │   └── [model]_lr_wd_heatmap.png
+│   └── final_test_plots/         # Test set evaluation visualizations
+│       ├── test_loss_comparison.png
+│       ├── test_metric_comparison.png
+│       ├── params_vs_performance.png
+│       └── training_time_comparison.png
+└── classification/    # Classification task diagnostics
+    ├── all_results.csv           # All training configurations and results
+    ├── best_configs.csv          # Best configuration per model type
+    ├── final_test_results.csv    # Test set evaluation results
+    ├── analysis_plots/           # Training analysis visualizations
+    │   ├── val_loss_by_model_type.png
+    │   ├── best_configs_comparison.png
+    │   ├── params_vs_loss.png
+    │   └── [model]_lr_wd_heatmap.png
+    └── final_test_plots/         # Test set evaluation visualizations
+        ├── test_loss_comparison.png
+        ├── test_metric_comparison.png
+        ├── params_vs_performance.png
+        └── training_time_comparison.png
 
 run_pipeline_regression.ps1      # PowerShell script for regression task
 run_pipeline_classification.ps1  # PowerShell script for classification task
@@ -107,6 +131,15 @@ Where $\alpha=0.03$ down-weights negative samples
 ```powershell
 .\run_pipeline_classification.ps1
 ```
+
+**Run Both Tasks in Parallel:**
+You can run both pipelines simultaneously in separate terminals without conflicts:
+- Terminal 1: `.\run_pipeline_regression.ps1`
+- Terminal 2: `.\run_pipeline_classification.ps1`
+
+Each pipeline saves results to task-specific directories:
+- Regression: `saved_models/regression/` and `diagnostics/regression/`
+- Classification: `saved_models/classification/` and `diagnostics/classification/`
 
 Each pipeline will sequentially:
 1. Train all models with grid search (3 runs per configuration)
@@ -169,15 +202,20 @@ python src/train.py --task classification
 
 #### 3. Analyze Results
 ```bash
-python src/analyze_results.py
+# Regression task (default)
+python src/analyze_results.py --task regression
+
+# Classification task
+python src/analyze_results.py --task classification
 ```
 
-**Note:** This step is task-agnostic - it analyzes whichever results are in `saved_models/`.
+**Command-line Arguments:**
+- `--task`: Task type - `regression` (default) or `classification`
 
 **Generates:**
-- `diagnostics/all_results.csv` - Complete grid search results
-- `diagnostics/best_configs.csv` - Best configuration per model type (selected by mean validation metric)
-- `diagnostics/analysis_plots/` - Comparative visualizations:
+- `diagnostics/{task}/all_results.csv` - Complete grid search results
+- `diagnostics/{task}/best_configs.csv` - Best configuration per model type (selected by mean validation metric)
+- `diagnostics/{task}/analysis_plots/` - Comparative visualizations:
   - Validation loss distribution by model type (boxplot)
   - Best configurations comparison (bar chart)
   - Model complexity vs performance (scatter plot)
@@ -205,8 +243,8 @@ python src/test.py --task classification
 - Generates comparative visualizations with error bars
 
 **Outputs:**
-- `diagnostics/final_test_results.csv` - Test metrics for all models
-- `diagnostics/final_test_plots/` - Comparative test visualizations
+- `diagnostics/{task}/final_test_results.csv` - Test metrics for all models
+- `diagnostics/{task}/final_test_plots/` - Comparative test visualizations
 
 #### 5. Run Tests
 ```bash

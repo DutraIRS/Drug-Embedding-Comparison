@@ -7,6 +7,11 @@ from src.layers import GCNConv, GATConv, MessagePassing
 
 from typing import Tuple, Literal
 
+from rdkit import Chem
+from rdkit.Chem import AllChem
+from rdkit import RDLogger
+RDLogger.DisableLog('rdApp.warning')
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -294,10 +299,6 @@ class FP(nn.Module):
         Returns:
             torch.Tensor: Predictions of shape [output_dim]
         """
-        # Import RDKit here to avoid pickling issues
-        from rdkit import Chem
-        from rdkit.Chem import AllChem
-        
         # Convert SMILES to molecule
         mol = Chem.MolFromSmiles(smiles)
         

@@ -203,8 +203,8 @@ def get_loaders(path, val_ratio, test_ratio, batch_size, task="regression"):
     return train_loader, val_loader, test_loader
 
 
-def save_model(name: str, model: torch.nn.Module):
-    folder_path = os.path.join(MODEL_FOLDER, name)
+def save_model(name: str, model: torch.nn.Module, task: str = "regression"):
+    folder_path = os.path.join(MODEL_FOLDER, task, name)
     if not os.path.exists(folder_path):
         os.makedirs(folder_path)
 
@@ -214,8 +214,8 @@ def save_model(name: str, model: torch.nn.Module):
 
     print(f"Model saved to {folder_path}")
 
-def save_losses(name: str, train_losses: list[float], val_losses: list[float] = None):
-    folder_path = os.path.join(MODEL_FOLDER, name)
+def save_losses(name: str, train_losses: list[float], val_losses: list[float] = None, task: str = "regression"):
+    folder_path = os.path.join(MODEL_FOLDER, task, name)
     if not os.path.exists(folder_path):
         os.makedirs(folder_path)
     
@@ -245,8 +245,8 @@ def save_losses(name: str, train_losses: list[float], val_losses: list[float] = 
     
     print(f"Losses saved to {folder_path}")
 
-def save_specs(name: str, specs: dict):
-    folder_path = os.path.join(MODEL_FOLDER, name)
+def save_specs(name: str, specs: dict, task: str = "regression"):
+    folder_path = os.path.join(MODEL_FOLDER, task, name)
     if not os.path.exists(folder_path):
         os.makedirs(folder_path)
     
@@ -254,8 +254,8 @@ def save_specs(name: str, specs: dict):
     df.index.name = 'specification'
     df.to_csv(os.path.join(folder_path, 'specs.csv'))
 
-def save_preds_kde(model, model_name, loader, model_type=None):
-    model.load_state_dict(torch.load(os.path.join(MODEL_FOLDER, model_name, 'model_weights.pt')))
+def save_preds_kde(model, model_name, loader, model_type=None, task="regression"):
+    model.load_state_dict(torch.load(os.path.join(MODEL_FOLDER, task, model_name, 'model_weights.pt')))
     
     model.eval() # freeze learning
     
@@ -313,7 +313,7 @@ def save_preds_kde(model, model_name, loader, model_type=None):
         plt.ylabel('Density')
         plt.xlim(-5, 10)
         plt.legend()
-        plt.savefig(os.path.join(MODEL_FOLDER, model_name, 'kde_plot.png'))
+        plt.savefig(os.path.join(MODEL_FOLDER, task, model_name, 'kde_plot.png'))
         plt.close()
 
 if __name__ == "__main__":
