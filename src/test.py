@@ -9,7 +9,6 @@ import torch.nn.functional as F
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-import seaborn as sns
 import argparse
 import time
 
@@ -32,7 +31,7 @@ FILE_PATH = './data/R_100.csv'
 VAL_RATIO = 0.2
 TEST_RATIO = 0.2
 BATCH_SIZE = 64
-EPOCHS = 1_000
+EPOCHS = 3_000
 N_TEST_RUNS = 5
 
 ### SETUP ###

@@ -28,7 +28,7 @@ FILE_PATH = './data/R_100.csv'
 VAL_RATIO = 0.2
 TEST_RATIO = 0.2
 BATCH_SIZE = 64
-EPOCHS = 3_000
+EPOCHS = 500
 N_RUNS = 3
 
 ### SETUP ###
@@ -267,6 +267,7 @@ for model_type in model_types:
                         model.train()
                         for X, A, y, smiles in train_loader:
                             optimizer.zero_grad()
+                            batch_loss = 0
                             
                             for i in range(len(X)):
                                 x = X[i]
@@ -296,8 +297,11 @@ for model_type in model_types:
                                     l = loss_fn(y_pred, w)
                                 
                                 epoch_train_loss += l.item()
-                                l.backward()
+                                batch_loss += l
                             
+                            # Average loss over batch before backward
+                            batch_loss = batch_loss / len(X)
+                            batch_loss.backward()
                             optimizer.step()
                         
                         # Validation loop
