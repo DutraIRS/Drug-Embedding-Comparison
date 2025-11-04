@@ -305,7 +305,14 @@ for idx, row in best_configs.iterrows():
                         l = loss_fn(y_pred, w)
                     
                     test_loss += l.item()
-                    all_preds.append(y_pred.cpu().numpy())
+                    
+                    # Collect predictions - apply sigmoid for classification
+                    if TASK == "classification":
+                        y_pred_probs = torch.sigmoid(y_pred)
+                        all_preds.append(y_pred_probs.cpu().numpy())
+                    else:
+                        all_preds.append(y_pred.cpu().numpy())
+                    
                     all_targets.append(w.cpu().numpy())
             
             # Average test loss

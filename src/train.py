@@ -342,7 +342,9 @@ for model_type in model_types:
                                     
                                     # Collect predictions for metric calculation
                                     if TASK == "classification":
-                                        val_predictions.append(y_pred.cpu().numpy())
+                                        # Apply sigmoid to get probabilities for AUROC
+                                        y_pred_probs = torch.sigmoid(y_pred)
+                                        val_predictions.append(y_pred_probs.cpu().numpy())
                                         val_targets.append(w.cpu().numpy())
                         
                         # Average over drugs in loader
@@ -358,9 +360,8 @@ for model_type in model_types:
                         
                         # Calculate metric (AUROC for classification, RMSE for regression)
                         if TASK == "classification":
-                            # Convert lists to arrays
-                            val_predictions_arr = np.array(val_predictions)
-                            val_targets_arr = np.array(val_targets)
+                            val_predictions_arr = np.vstack(val_predictions)
+                            val_targets_arr = np.vstack(val_targets)
                             
                             # Calculate AUROC for each side effect
                             aurocs = []
@@ -382,7 +383,6 @@ for model_type in model_types:
                             val_metrics.append(epoch_metric)
                             metric_name = "RMSE"
                         
-                        if epoch % 100 == 0 or epoch == EPOCHS - 1:
                             print(f"  Epoch {epoch+1}/{EPOCHS} - "
                                 f"Train Loss: {epoch_train_loss:.8f} - "
                                 f"Val Loss: {epoch_val_loss:.8f} - "
