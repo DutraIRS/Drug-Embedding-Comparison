@@ -154,3 +154,131 @@ class TestGNN:
         
         with pytest.raises(TypeError):
             model = models.GNN("MessagePassing", 3, 5, 2, num_hidden=3, activation=nn.ReLU())
+
+
+class TestTransformer:
+    def test_init(self):
+        """
+        Test the initialization of the Transformer model
+        """
+        model = models.Transformer(input_dim=10, d_model=64, nhead=4, num_layers=2, dim_feedforward=128, output_dim=5)
+        
+        assert isinstance(model, models.Transformer)
+        assert isinstance(model, models.nn.Module)
+        assert model.max_seq_len == 200
+        assert model.positional_encoding.shape == (1, 200, 64)
+    
+    def test_forward(self):
+        """
+        Test the forward pass of the Transformer model
+        """
+        model = models.Transformer(input_dim=10, d_model=64, nhead=4, num_layers=2, dim_feedforward=128, output_dim=5)
+        
+        # Test with different sequence lengths
+        x1 = torch.randn(15, 10)  # 15 atoms
+        a1 = torch.eye(15)
+        out1 = model(x1, a1)
+        
+        assert isinstance(out1, torch.Tensor)
+        assert out1.shape == (5,)  # Output is [output_dim]
+        
+        x2 = torch.randn(50, 10)  # 50 atoms
+        a2 = torch.eye(50)
+        out2 = model(x2, a2)
+        
+        assert isinstance(out2, torch.Tensor)
+        assert out2.shape == (5,)  # Output is [output_dim]
+    
+    def test_positional_encoding(self):
+        """
+        Test that positional encoding works correctly with sequences up to max_len
+        """
+        model = models.Transformer(input_dim=10, d_model=64, nhead=4, num_layers=2, dim_feedforward=128, output_dim=5)
+        
+        # Test with sequence at max_len
+        x = torch.randn(200, 10)  # At max_len=200
+        a = torch.eye(200)
+        
+        # Should work fine
+        out = model(x, a)
+        assert isinstance(out, torch.Tensor)
+        assert out.shape == (5,)
+    
+    def test_model_number_of_parameters(self):
+        """
+        Test the number of parameters in the Transformer model
+        """
+        model = models.Transformer(input_dim=10, d_model=64, nhead=4, num_layers=2, dim_feedforward=128, output_dim=5)
+        num_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+        
+        # Just verify it has parameters
+        assert num_params > 0
+
+
+class TestFP:
+    def test_init(self):
+        """
+        Test the initialization of the FP (Fingerprint) model
+        """
+        model = models.FP(radius=2, n_bits=1024, output_dim=994)
+        
+        assert isinstance(model, models.FP)
+        assert isinstance(model, models.nn.Module)
+        assert model.radius == 2
+        assert model.n_bits == 1024
+    
+    def test_forward(self):
+        """
+        Test the forward pass of the FP model with valid SMILES
+        """
+        model = models.FP(radius=2, n_bits=1024, output_dim=5)
+        
+        # Test with a valid SMILES string
+        smiles = "CCO"  # Ethanol
+        out = model(smiles)
+        
+        assert isinstance(out, torch.Tensor)
+        assert out.shape == (5,)
+    
+    def test_forward_batch(self):
+        """
+        Test the forward pass with multiple SMILES
+        """
+        model = models.FP(radius=3, n_bits=2048, output_dim=10)
+        
+        # Test with different SMILES
+        smiles_list = ["CCO", "CC(=O)O", "c1ccccc1"]  # Ethanol, Acetic acid, Benzene
+        
+        for smiles in smiles_list:
+            out = model(smiles)
+            assert isinstance(out, torch.Tensor)
+            assert out.shape == (10,)
+    
+    def test_different_radii(self):
+        """
+        Test with different fingerprint radii
+        """
+        for radius in [2, 3, 4]:
+            model = models.FP(radius=radius, n_bits=1024, output_dim=5)
+            out = model("CCO")
+            assert out.shape == (5,)
+    
+    def test_different_bit_sizes(self):
+        """
+        Test with different fingerprint bit sizes
+        """
+        for n_bits in [512, 1024, 2048]:
+            model = models.FP(radius=2, n_bits=n_bits, output_dim=5)
+            out = model("CCO")
+            assert out.shape == (5,)
+    
+    def test_model_number_of_parameters(self):
+        """
+        Test the number of parameters in the FP model
+        """
+        model = models.FP(radius=2, n_bits=1024, output_dim=994)
+        num_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+        
+        # FP has linear layer: 1024 * 994 + 994 (bias)
+        expected_params = 1024 * 994 + 994
+        assert num_params == expected_params

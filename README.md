@@ -259,10 +259,10 @@ python src/test.py --task classification
 
 **Test Coverage:**
 - **layers.py**: 100% coverage - All GNN layer types tested
-- **models.py**: 88% coverage - All model architectures tested
-- **42 tests total** covering:
-  - Custom GNN layers: GCNConv, GATConv, MessagePassing (21 tests)
-  - Model architectures: VAE, GNN, Transformer, FP, FCNN (21 tests)
+- **models.py**: 100% coverage - All model architectures tested
+- **35 tests total** covering:
+  - Custom GNN layers: GCNConv, GATConv, MessagePassing (15 tests)
+  - Model architectures: VAE, FCNN, GNN, Transformer, FP (20 tests)
 - HTML coverage report: `htmlcov/index.html`
 
 ## Model Architecture Details
