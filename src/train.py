@@ -11,7 +11,6 @@ import argparse
 
 from torchinfo import summary
 from itertools import product
-from sklearn.metrics import roc_auc_score
 
 from src.utils import *
 from src.models import VAE, GNN, FP, FCNN, Transformer
@@ -259,16 +258,10 @@ for model_type in model_types:
 
                     train_losses = []
                     val_losses = []
-                    val_metrics = []  # Will store AUROC for classification, RMSE for regression
                     
                     for epoch in range(EPOCHS):
                         epoch_train_loss = 0
                         epoch_val_loss = 0
-                        
-                        # For classification: collect predictions and targets for AUROC
-                        if TASK == "classification":
-                            val_predictions = []
-                            val_targets = []
                         
                         # Train loop
                         model.train()
@@ -339,13 +332,6 @@ for model_type in model_types:
                                         l = loss_fn(y_pred, w)
                                     
                                     epoch_val_loss += l.item()
-                                    
-                                    # Collect predictions for metric calculation
-                                    if TASK == "classification":
-                                        # Apply sigmoid to get probabilities for AUROC
-                                        y_pred_probs = torch.sigmoid(y_pred)
-                                        val_predictions.append(y_pred_probs.cpu().numpy())
-                                        val_targets.append(w.cpu().numpy())
                         
                         # Average over drugs in loader
                         epoch_train_loss /= len(train_loader.dataset)
@@ -358,35 +344,9 @@ for model_type in model_types:
                         train_losses.append(epoch_train_loss)
                         val_losses.append(epoch_val_loss)
                         
-                        # Calculate metric (AUROC for classification, RMSE for regression)
-                        if TASK == "classification":
-                            val_predictions_arr = np.vstack(val_predictions)
-                            val_targets_arr = np.vstack(val_targets)
-                            
-                            # Calculate AUROC for each side effect
-                            aurocs = []
-                            for se_idx in range(val_targets_arr.shape[1]):
-                                try:
-                                    # Only calculate if we have both classes
-                                    if len(np.unique(val_targets_arr[:, se_idx])) > 1:
-                                        auroc = roc_auc_score(val_targets_arr[:, se_idx], val_predictions_arr[:, se_idx])
-                                        aurocs.append(auroc)
-                                except:
-                                    pass  # Skip if error (e.g., all one class)
-                            
-                            epoch_metric = np.mean(aurocs) if aurocs else 0.0
-                            val_metrics.append(epoch_metric)
-                            metric_name = "AUROC"
-                        else:
-                            # For regression, use RMSE (sqrt of MSE loss)
-                            epoch_metric = np.sqrt(epoch_val_loss)
-                            val_metrics.append(epoch_metric)
-                            metric_name = "RMSE"
-                        
                         print(f"  Epoch {epoch+1}/{EPOCHS} - "
                             f"Train Loss: {epoch_train_loss:.8f} - "
-                            f"Val Loss: {epoch_val_loss:.8f} - "
-                            f"Val {metric_name}: {epoch_metric:.8f}")
+                            f"Val Loss: {epoch_val_loss:.8f}")
                     
                     # Save final model (after all epochs)
                     save_model(model_name, model, task=TASK)
@@ -406,15 +366,12 @@ for model_type in model_types:
                     
                     # Save model specs for this run
                     last_val_loss = val_losses[-1]
-                    last_val_metric = val_metrics[-1]
                     
                     specs = {
                         'model_name': model_name,
                         'model_type': model_type,
                         'n_parameters': n_params,
                         'last_val_loss': last_val_loss,
-                        'last_val_metric': last_val_metric,
-                        'metric_name': metric_name,
                         'learning_rate': learning_rate,
                         'weight_decay': weight_decay,
                         'model_architecture': model_architecture,
@@ -434,24 +391,19 @@ for model_type in model_types:
                     run_results.append({
                         'run': run_idx + 1,
                         'last_val_loss': last_val_loss,
-                        'last_val_metric': last_val_metric,
                         'model_name': model_name
                     })
                     
-                    print(f'  Run {run_idx + 1} complete! Last val loss: {last_val_loss:.4f}, {metric_name}: {last_val_metric:.4f}')
+                    print(f'  Run {run_idx + 1} complete! Last val loss: {last_val_loss:.4f}')
                 
                 # Calculate statistics across runs
                 val_losses_all_runs = [r['last_val_loss'] for r in run_results]
-                val_metrics_all_runs = [r['last_val_metric'] for r in run_results]
             
             mean_val_loss = np.mean(val_losses_all_runs)
             std_val_loss = np.std(val_losses_all_runs)
-            mean_val_metric = np.mean(val_metrics_all_runs)
-            std_val_metric = np.std(val_metrics_all_runs)
             
             print(f'\n  Summary for {base_model_name}:')
             print(f'    Mean val loss: {mean_val_loss:.4f} ± {std_val_loss:.4f}')
-            print(f'    Mean val {metric_name}: {mean_val_metric:.4f} ± {std_val_metric:.4f}')
             print(f'    Individual runs: {[f"{v:.4f}" for v in val_losses_all_runs]}')
             
             # Save summary specs for the configuration (average across runs)
@@ -462,13 +414,8 @@ for model_type in model_types:
                 'n_parameters': n_params,
                 'mean_val_loss': mean_val_loss,
                 'std_val_loss': std_val_loss,
-                'mean_val_metric': mean_val_metric,
-                'std_val_metric': std_val_metric,
                 'best_val_loss': min(val_losses_all_runs),
                 'worst_val_loss': max(val_losses_all_runs),
-                'best_val_metric': max(val_metrics_all_runs) if TASK == "classification" else min(val_metrics_all_runs),
-                'worst_val_metric': min(val_metrics_all_runs) if TASK == "classification" else max(val_metrics_all_runs),
-                'metric_name': metric_name,
                 'n_runs': N_RUNS,
                 'learning_rate': learning_rate,
                 'weight_decay': weight_decay,
