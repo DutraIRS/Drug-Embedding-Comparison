@@ -31,12 +31,8 @@ src/
 └── trim_data.ipynb    # Notebook for data preprocessing and subset creation
 
 test/
-├── test_layers.py          # Unit tests for GNN layers
-├── test_models.py          # Unit tests for model architectures
-├── test_utils.py           # Unit tests for utilities
-├── test_loss.py            # Unit tests for loss functions
-├── test_train.py           # Unit tests for training pipeline
-└── test_analyze_results.py # Unit tests for results analysis
+├── test_layers.py     # Unit tests for GNN layers
+└── test_models.py     # Unit tests for model architectures
 
 data/
 ├── R.csv              # Full dataset (molecules × side effects)
@@ -250,21 +246,23 @@ python src/test.py --task classification
 
 #### 5. Run Tests
 ```bash
-# Quick test run
-pytest test/ -q
+# Run all tests with coverage
 
-# With coverage report
-pytest --cov=src --cov-report=term-missing --cov-report=html
+# View coverage report
+# After running pytest, open htmlcov/index.html in a browser
 ```
 
+**Test Configuration:**
+- Configured in `pytest.ini` to focus on core modules
+- Coverage targets: `src.layers` and `src.models` only
+- Automatic HTML report generation in `htmlcov/`
+
 **Test Coverage:**
-- Core modules: `layers.py` (100%), `models.py` (88%), `analyze_results.py` (41%), `utils.py` (50%)
-- **65 tests** covering:
-  - Model architectures and GNN layers (25 tests)
-  - Loss functions - DataDrivenLoss and WeightedBCELoss (20 tests)
-  - Training pipeline and utilities (11 tests)
-  - Results analysis (9 tests)
-- Overall coverage: 32%
+- **layers.py**: 100% coverage - All GNN layer types tested
+- **models.py**: 88% coverage - All model architectures tested
+- **42 tests total** covering:
+  - Custom GNN layers: GCNConv, GATConv, MessagePassing (21 tests)
+  - Model architectures: VAE, GNN, Transformer, FP, FCNN (21 tests)
 - HTML coverage report: `htmlcov/index.html`
 
 ## Model Architecture Details
@@ -357,6 +355,3 @@ After running the full pipeline, you can compare:
 - **CPU**: Works but significantly slower
 - **RAM**: 8GB+ recommended
 - **Storage**: ~500MB for models and results (depends on grid search size)
-
-## License
-See LICENSE file for details.
