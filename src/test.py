@@ -379,9 +379,10 @@ for idx, row in best_configs.iterrows():
             
             save_specs(model_name, specs, task=TASK)
             
-            # Save KDE plot for first run only
+            # Save KDE plots for train_val, and test sets (first run only)
             if test_run_idx == 0:
-                save_preds_kde(model, model_name, test_loader, model_type=model_type, task=TASK)
+                save_preds_kde(model, model_name, train_val_loader, model_type=model_type, task=TASK, split="train_val")
+                save_preds_kde(model, model_name, test_loader, model_type=model_type, task=TASK, split="test")
     
     # Calculate statistics across test runs
     test_losses_all_runs = [r['test_loss'] for r in test_run_results]

@@ -29,7 +29,7 @@ FILE_PATH = './data/R_100.csv'
 VAL_RATIO = 0.2
 TEST_RATIO = 0.2
 BATCH_SIZE = 64
-EPOCHS = 1_000
+EPOCHS = 3_000
 N_RUNS = 3
 
 ### SETUP ###
@@ -52,8 +52,8 @@ input_dim = sample_X.size(1)
 
 # General hyperparameters (all models)
 general_configs = {
-    'learning_rates': [1e-5, 1e-4],
-    'weight_decays': [1e-6, 1e-4],
+    'learning_rates': [1e-5, 1e-4, 1e-3],
+    'weight_decays': [1e-6, 1e-4, 1e-2],
 }
 
 # Model-specific hyperparameters
@@ -79,7 +79,7 @@ model_specific_configs = {
         'num_layers': [3, 6],
         'd_model': [64, 128],
         'nhead': [4, 8],
-        'dim_feedforward': [256, 512]
+        'dim_feedforward': [128, 256]
     },
     'FP': {
         'radius': [2, 3],
@@ -383,10 +383,10 @@ for model_type in model_types:
                             val_metrics.append(epoch_metric)
                             metric_name = "RMSE"
                         
-                            print(f"  Epoch {epoch+1}/{EPOCHS} - "
-                                f"Train Loss: {epoch_train_loss:.8f} - "
-                                f"Val Loss: {epoch_val_loss:.8f} - "
-                                f"Val {metric_name}: {epoch_metric:.8f}")
+                        print(f"  Epoch {epoch+1}/{EPOCHS} - "
+                            f"Train Loss: {epoch_train_loss:.8f} - "
+                            f"Val Loss: {epoch_val_loss:.8f} - "
+                            f"Val {metric_name}: {epoch_metric:.8f}")
                     
                     # Save final model (after all epochs)
                     save_model(model_name, model, task=TASK)
@@ -426,8 +426,9 @@ for model_type in model_types:
                     
                     save_specs(model_name, specs, task=TASK)
                     
-                    # Save KDE predictions for this run
-                    save_preds_kde(model, model_name, val_loader, model_type=model_type, task=TASK)
+                    # Save KDE predictions for train, val, and test sets
+                    save_preds_kde(model, model_name, train_loader, model_type=model_type, task=TASK, split="train")
+                    save_preds_kde(model, model_name, val_loader, model_type=model_type, task=TASK, split="val")
                     
                     # Store result for this run
                     run_results.append({

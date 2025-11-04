@@ -357,7 +357,7 @@ def save_specs(name: str, specs: dict, task: str = "regression") -> None:
     df.to_csv(os.path.join(folder_path, 'specs.csv'))
 
 def save_preds_kde(model: nn.Module, model_name: str, loader: DataLoader, 
-                   model_type: str = None, task: str = "regression") -> None:
+                   model_type: str = None, task: str = "regression", split: str = "val") -> None:
     """Generate KDE plots of predicted side effect frequencies
     
     Args:
@@ -366,12 +366,18 @@ def save_preds_kde(model: nn.Module, model_name: str, loader: DataLoader,
         loader: DataLoader for generating predictions
         model_type: Type of model ("VAE", "FP", etc.) - determines preprocessing
         task: Task type for directory organization - "regression" or "classification"
+        split: Dataset split name ("train", "val", or "test") for plot labeling
     """
     model.load_state_dict(torch.load(os.path.join(MODEL_FOLDER, task, model_name, 'model_weights.pt')))
     
     model.eval() # freeze learning
     
-    preds = {0: [], 1: [], 2: [], 3: [], 4: [], 5: []}
+    if task == "classification":
+        # For classification: collect predictions for each true class (0 or 1)
+        preds = {0: [], 1: []}  # Keys are true labels (0=absent, 1=present)
+    else:
+        # For regression: collect predictions for each true score (0-5)
+        preds = {0: [], 1: [], 2: [], 3: [], 4: [], 5: []}
     
     with torch.no_grad(): # stop tracking gradients
         for X, A, y, smiles in loader:
@@ -404,28 +410,50 @@ def save_preds_kde(model: nn.Module, model_name: str, loader: DataLoader,
                 elif y_pred.dim() > 1:
                     y_pred = y_pred.squeeze()
 
-                for j in range(6):
-                    mask = (w == j)
-                    
-                    preds_for_i = y_pred[mask].cpu().numpy().tolist()
-                    
-                    preds[j].extend(preds_for_i)
+                # Apply sigmoid for classification to get probabilities
+                if task == "classification":
+                    y_pred = torch.sigmoid(y_pred)
+                
+                # Group predictions by true label
+                for true_label in preds.keys():
+                    mask = (w == true_label)
+                    preds_for_label = y_pred[mask].cpu().numpy().tolist()
+                    preds[true_label].extend(preds_for_label)
         
-        # KDE per side effect frequency        
+        # KDE per side effect frequency/class
         plt.figure(figsize=(10, 6))
-        for i in range(6):
-            sns.kdeplot(
-                preds[i],
-                label=f'Side Effect {i}',
-                fill=True,
-                alpha=0.5
-            )
-        plt.title('KDE of Predicted Side Effects')
-        plt.xlabel('Predicted Frequency')
-        plt.ylabel('Density')
-        plt.xlim(-5, 10)
+        
+        if task == "classification":
+            # For classification: plot probability distributions for each true class
+            for true_label in [0, 1]:
+                if len(preds[true_label]) > 0:
+                    sns.kdeplot(
+                        preds[true_label],
+                        label=f'True Class {true_label} ({"Absent" if true_label == 0 else "Present"})',
+                        fill=True,
+                        alpha=0.5
+                    )
+            plt.title(f'KDE of Predicted Probabilities ({split} set)')
+            plt.xlabel('Predicted Probability')
+            plt.ylabel('Density')
+            plt.xlim(-0.1, 1.1)
+        else:
+            # For regression: plot score distributions for each true score
+            for score in range(6):
+                if len(preds[score]) > 0:
+                    sns.kdeplot(
+                        preds[score],
+                        label=f'True Score {score}',
+                        fill=True,
+                        alpha=0.5
+                    )
+            plt.title(f'KDE of Predicted Scores ({split} set)')
+            plt.xlabel('Predicted Score')
+            plt.ylabel('Density')
+            plt.xlim(-1, 6)
+        
         plt.legend()
-        plt.savefig(os.path.join(MODEL_FOLDER, task, model_name, 'kde_plot.png'))
+        plt.savefig(os.path.join(MODEL_FOLDER, task, model_name, f'kde_plot_{split}.png'))
         plt.close()
 
 if __name__ == "__main__":
