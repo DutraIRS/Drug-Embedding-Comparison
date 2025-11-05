@@ -1,22 +1,23 @@
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+import time
+import argparse
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import pandas as pd
-import numpy as np
-import matplotlib.pyplot as plt
-import argparse
-import time
 
-from torchinfo import summary
 from sklearn.metrics import roc_auc_score
 
 from src.utils import *
-from src.models import VAE, GNN, FP, FCNN, Transformer
+from src.models import *
 
 ### PARSE COMMAND LINE ARGUMENTS ###
 parser = argparse.ArgumentParser(description='Test best drug side effect prediction models')
@@ -75,6 +76,30 @@ train_val_loader = DataLoader(train_val_dataset, batch_size=BATCH_SIZE, shuffle=
 print(f"\nDataset sizes:")
 print(f"  Train+Val: {len(train_val_dataset)} samples")
 print(f"  Test: {len(test_loader.dataset)} samples")
+
+def _safe_predict(model_type, model, x, a, w, smile, loss_fn):
+    """Helper function to safely call model and loss function based on model type"""
+    if model_type == "VAE":
+        x = torch.argmax(x, dim=1).float()
+        
+        if len(x) < 100:
+            x = F.pad(x, (0, 100 - len(x)), "constant", 0)
+        
+        if x.dim() == 1:
+            x = x.unsqueeze(0)
+
+        x_reconstructed, y_pred, mu, logvar = model(x)
+        l = loss_fn(y_pred, w, x, x_reconstructed)
+    
+    elif model_type == "FP":
+        y_pred = model(smile)
+        l = loss_fn(y_pred, w)
+    
+    else:
+        y_pred = model(x, a)
+        l = loss_fn(y_pred, w)
+    
+    return l
 
 def create_model_from_config(row: pd.Series, input_dim: int, output_dim: int = 994) -> tuple[nn.Module, float | None]:
     """Create model from best config row
@@ -222,25 +247,7 @@ for idx, row in best_configs.iterrows():
                     w = y[i]
                     smile = smiles[i]
                     
-                    if model_type == "VAE":
-                        x = torch.argmax(x, dim=1).float()
-                        
-                        if len(x) < 100:
-                            x = F.pad(x, (0, 100 - len(x)), "constant", 0)
-                        
-                        if x.dim() == 1:
-                            x = x.unsqueeze(0)
-
-                        x_reconstructed, y_pred, mu, logvar = model(x)
-                        l = loss_fn(y_pred, w, x, x_reconstructed)
-                    
-                    elif model_type == "FP":
-                        y_pred = model(smile)
-                        l = loss_fn(y_pred, w)
-                    
-                    else:
-                        y_pred = model(x, a)
-                        l = loss_fn(y_pred, w)
+                    l = _safe_predict(model_type, model, x, a, w, smile, loss_fn)
                     
                     epoch_train_loss += l.item()
                     l.backward()

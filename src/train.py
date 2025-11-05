@@ -1,20 +1,20 @@
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import numpy as np
-import argparse
 
-from torchinfo import summary
+import argparse
+import numpy as np
+
 from itertools import product
-from sklearn.metrics import roc_auc_score
+from torchinfo import summary
 
 from src.utils import *
-from src.models import VAE, GNN, FP, FCNN, Transformer
+from src.models import *
 
 ### PARSE COMMAND LINE ARGUMENTS ###
 parser = argparse.ArgumentParser(description='Train drug side effect prediction models')
@@ -29,7 +29,7 @@ FILE_PATH = './data/R_100.csv'
 VAL_RATIO = 0.2
 TEST_RATIO = 0.2
 BATCH_SIZE = 64
-EPOCHS = 500
+EPOCHS = 300
 N_RUNS = 3
 
 ### SETUP ###
@@ -195,13 +195,13 @@ def get_model_name(model_type: str, config: dict, lr: float, wd: float) -> str:
         value = config[key]
         # Shorten key names for readability
         short_key = key.replace('num_layers', 'nlayers') \
-                      .replace('hidden_dim', 'hdim') \
-                      .replace('latent_dim', 'latent') \
-                      .replace('reconstruction_beta', 'beta') \
-                      .replace('dim_feedforward', 'ffn') \
-                      .replace('d_model', 'dmodel') \
-                      .replace('num_hidden', 'nhidden') \
-                      .replace('n_bits', 'bits')
+                        .replace('hidden_dim', 'hdim') \
+                        .replace('latent_dim', 'latent') \
+                        .replace('reconstruction_beta', 'beta') \
+                        .replace('dim_feedforward', 'ffn') \
+                        .replace('d_model', 'dmodel') \
+                        .replace('num_hidden', 'nhidden') \
+                        .replace('n_bits', 'bits')
         
         parts.append(f"{short_key}{value}")
     
@@ -213,6 +213,30 @@ def get_model_name(model_type: str, config: dict, lr: float, wd: float) -> str:
 
 ### GRID SEARCH ###
 model_types = ["GCN", "GAT", "MPNN", "Transformer", "FP", "FCNN", "VAE"]
+
+def _safe_predict(model_type, model, x, a, w, smile, loss_fn):
+    """Helper function to safely call model and loss function based on model type"""
+    if model_type == "VAE":
+        x = torch.argmax(x, dim=1).float()
+        
+        if len(x) < 100:
+            x = F.pad(x, (0, 100 - len(x)), "constant", 0)
+        
+        if x.dim() == 1:
+            x = x.unsqueeze(0)
+
+        x_reconstructed, y_pred, mu, logvar = model(x)
+        l = loss_fn(y_pred, w, x, x_reconstructed)
+    
+    elif model_type == "FP":
+        y_pred = model(smile)
+        l = loss_fn(y_pred, w)
+    
+    else:
+        y_pred = model(x, a)
+        l = loss_fn(y_pred, w)
+    
+    return l
 
 for model_type in model_types:
     print(f"\n{'='*50}\nTraining {model_type} models\n{'='*50}")
@@ -277,25 +301,7 @@ for model_type in model_types:
                                 w = y[i]
                                 smile = smiles[i]
                                 
-                                if model_type == "VAE":
-                                    x = torch.argmax(x, dim=1).float()
-                                    
-                                    if len(x) < 100:
-                                        x = F.pad(x, (0, 100 - len(x)), "constant", 0)
-                                    
-                                    if x.dim() == 1:
-                                        x = x.unsqueeze(0)
-
-                                    x_reconstructed, y_pred, mu, logvar = model(x)
-                                    l = loss_fn(y_pred, w, x, x_reconstructed)
-                                
-                                elif model_type == "FP":
-                                    y_pred = model(smile)
-                                    l = loss_fn(y_pred, w)
-                                
-                                else:
-                                    y_pred = model(x, a)
-                                    l = loss_fn(y_pred, w)
+                                l = _safe_predict(model_type, model, x, a, w, smile, loss_fn)
                                 
                                 epoch_train_loss += l.item()
                                 batch_loss += l
@@ -315,25 +321,7 @@ for model_type in model_types:
                                     w = y[i]
                                     smile = smiles[i]
                                     
-                                    if model_type == "VAE":
-                                        x = torch.argmax(x, dim=1).float()
-                                        
-                                        if len(x) < 100:
-                                            x = F.pad(x, (0, 100 - len(x)), "constant", 0)
-                                        
-                                        if x.dim() == 1:
-                                            x = x.unsqueeze(0)
-
-                                        x_reconstructed, y_pred, mu, logvar = model(x)
-                                        l = loss_fn(y_pred, w, x, x_reconstructed)
-                                    
-                                    elif model_type == "FP":
-                                        y_pred = model(smile)
-                                        l = loss_fn(y_pred, w)
-                                    
-                                    else:
-                                        y_pred = model(x, a)
-                                        l = loss_fn(y_pred, w)
+                                    l = _safe_predict(model_type, model, x, a, w, smile, loss_fn)
                                     
                                     epoch_val_loss += l.item()
                         
@@ -353,13 +341,13 @@ for model_type in model_types:
                                 f"Train Loss: {epoch_train_loss:.8f} - "
                                 f"Val Loss: {epoch_val_loss:.8f}")
                     
-                    # Save final model (after all epochs)
+                    # Save final model
                     # save_model(model_name, model, task=TASK)
                     
-                    # Save and plot losses (after all epochs)
+                    # Save and plot losses
                     save_losses(model_name, train_losses, val_losses, task=TASK)
                     
-                    # Save model architecture (after training)
+                    # Save model architecture
                     with torch.no_grad():
                         if model_type == "VAE":
                             model_architecture = str(summary(model, input_data=x, verbose=0))

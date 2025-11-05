@@ -31,6 +31,7 @@ class GCNConv(nn.Module):
         Returns:
             torch.Tensor: Output graph of shape [num_nodes, output_dim]
         """
+        # pretty
         D_tilde = torch.diag(A.sum(dim=0) ** (-1/2))
         A_tilde = D_tilde  @ A @ D_tilde
         X_tilde = A_tilde @ X @ self.W

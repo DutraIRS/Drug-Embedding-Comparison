@@ -1,14 +1,17 @@
+import os
+
+import numpy as np
+import pandas as pd
+
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+from rdkit import Chem
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader, random_split
-from rdkit import Chem
-
-import os
-import numpy as np
-import pandas as pd
-import seaborn as sns
-import matplotlib.pyplot as plt
 
 ### Random number generator seed
 RANDOM_STATE = 42
@@ -88,7 +91,6 @@ class DrugSideEffectsDataset(Dataset):
     Converts SMILES strings to molecular graphs with node features and adjacency matrices.
     Supports both regression (predicting 0-5 scores) and classification (binary prediction) tasks.
     """
-    
     def __init__(self, smiles: list[str], side_effects_data: torch.Tensor | np.ndarray, task: str = "regression"):
         """Initialize the dataset
         
@@ -102,7 +104,6 @@ class DrugSideEffectsDataset(Dataset):
         
         # Binarize for classification task
         if task == "classification":
-            # Handle both numpy arrays and torch tensors
             if isinstance(side_effects_data, torch.Tensor):
                 self.side_effects_data = (side_effects_data > 0).float()
             else:
@@ -278,7 +279,6 @@ def get_loaders(path: str, val_ratio: float, test_ratio: float, batch_size: int,
                                 collate_fn=full_dataset.collate_fn)
 
     return train_loader, val_loader, test_loader
-
 
 def save_model(name: str, model: nn.Module, task: str = "regression") -> None:
     """Save model weights to disk
