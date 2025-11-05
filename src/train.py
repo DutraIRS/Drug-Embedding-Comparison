@@ -29,8 +29,8 @@ FILE_PATH = './data/R_100.csv'
 VAL_RATIO = 0.2
 TEST_RATIO = 0.2
 BATCH_SIZE = 64
-EPOCHS = 300
-N_RUNS = 3
+EPOCHS = 00
+N_RUNS = 1
 
 ### SETUP ###
 device = (
@@ -342,7 +342,7 @@ for model_type in model_types:
                                 f"Val Loss: {epoch_val_loss:.8f}")
                     
                     # Save final model
-                    # save_model(model_name, model, task=TASK)
+                    save_model(model_name, model, task=TASK)
                     
                     # Save and plot losses
                     save_losses(model_name, train_losses, val_losses, task=TASK)
@@ -350,7 +350,9 @@ for model_type in model_types:
                     # Save model architecture
                     with torch.no_grad():
                         if model_type == "VAE":
-                            model_architecture = str(summary(model, input_data=x, verbose=0))
+                            # Create a sample input for VAE (expects [batch, seq_len] with seq_len=100)
+                            sample_input = torch.randint(0, input_dim, (1, 100)).float()
+                            model_architecture = str(summary(model, input_data=sample_input, verbose=0))
                         elif model_type == "FP":
                             # torchinfo doesn't support string inputs, so use str(model) instead
                             model_architecture = str(model)
