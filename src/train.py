@@ -29,8 +29,8 @@ FILE_PATH = './data/R_100.csv'
 VAL_RATIO = 0.2
 TEST_RATIO = 0.2
 BATCH_SIZE = 64
-EPOCHS = 00
-N_RUNS = 1
+EPOCHS = 500
+N_RUNS = 3
 
 ### SETUP ###
 device = (
