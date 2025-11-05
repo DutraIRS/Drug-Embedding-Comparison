@@ -2,7 +2,7 @@
 Final Project for Bachelor's Degree in Data Science and AI
 
 ## Overview
-This project compares different molecular embedding approaches for predicting drug side effects. We implement and evaluate 7 different model architectures on a dataset of molecules and their associated 994 side effects.
+This project compares different molecular embedding approaches for predicting drug side effects. I implemented and evaluated 7 different model architectures on a dataset of molecules and their associated 994 side effects.
 
 The pipeline supports **two distinct tasks**:
 - **Regression**: Predict frequency scores (0-5 scale)
@@ -118,7 +118,14 @@ Where $\alpha=0.03$ down-weights negative samples
 
 ## Quick Start
 
-### Option 1: Run Full Pipeline (Automated)
+### 1. Install Dependencies
+```powershell
+python -m venv venv
+venv\Scripts\activate
+pip install -r requirements.txt
+```
+
+### 2. Run Pipeline
 
 **For Regression Task:**
 ```powershell
@@ -144,36 +151,11 @@ Each pipeline will sequentially:
 2. Analyze results and select best configurations
 3. Test best models on test set (5 runs per model)
 
-### Option 2: Manual Execution
-
-#### 1. Install Dependencies
-```bash
-pip install -r requirements.txt
-```
-
-Required packages:
-- PyTorch 2.6.0+ (with CUDA support for GPU training)
-- RDKit (for molecular fingerprints)
-- NumPy, Pandas, Matplotlib, Seaborn
-- scikit-learn (for AUROC metric)
-- pytest, pytest-cov (for testing)
-
-#### 2. Train Models
-```bash
-# Regression task (default)
-python src/train.py --task regression
-
-# Classification task
-python src/train.py --task classification
-```
-
-**Command-line Arguments:**
-- `--task`: Task type - `regression` (default) or `classification`
 
 **Features:**
 - Grid search over model-specific hyperparameters
 - **3 independent runs** per configuration for statistical robustness
-- Automatic model checkpointing (saves final model, not best)
+- Automatic model checkpointing
 - Tracks mean ± std validation loss across runs
 - **Task-specific metrics**: RMSE for regression, AUROC for classification
 - Generates loss curves and KDE plots
@@ -191,49 +173,26 @@ python src/train.py --task classification
 **Training Configuration:**
 - Dataset: `data/R_100.csv` (samples with less than 100 atoms)
 - Split: 60% train / 20% val / 20% test
-- Epochs: 1_000 (configurable via `EPOCHS` variable)
+- Epochs: 500 (configurable via `EPOCHS` variable)
 - Runs per config: 3 (configurable via `N_RUNS`)
 - Device: CUDA if available, else CPU
 - **Task-specific loss**:
   - Regression: `DataDrivenLoss` (Weighted RMSE with α=0.03)
   - Classification: `WeightedBCELoss` (Weighted BCE with α=0.03)
 
-#### 3. Analyze Results
-```bash
-# Regression task (default)
-python src/analyze_results.py --task regression
-
-# Classification task
-python src/analyze_results.py --task classification
-```
-
-**Command-line Arguments:**
-- `--task`: Task type - `regression` (default) or `classification`
-
 **Generates:**
 - `diagnostics/{task}/all_results.csv` - Complete grid search results
-- `diagnostics/{task}/best_configs.csv` - Best configuration per model type (selected by mean validation metric)
+- `diagnostics/{task}/best_configs.csv` - Best configuration per model type (selected by mean validation loss)
 - `diagnostics/{task}/analysis_plots/` - Comparative visualizations:
   - Validation loss distribution by model type (boxplot)
   - Best configurations comparison (bar chart)
   - Model complexity vs performance (scatter plot)
   - Hyperparameter impact heatmaps (learning rate × weight decay)
 
-#### 4. Final Testing
-```bash
-# Regression task (default)
-python src/test.py --task regression
-
-# Classification task
-python src/test.py --task classification
-```
-
-**Command-line Arguments:**
-- `--task`: Task type - `regression` (default) or `classification`
-
+### 3. Final Testing
 **Features:**
 - Loads best configurations from `analyze_results.py`
-- Trains each model on combined train+val set
+- Trains each model on combined train+val set for 3000 epochs
 - **5 independent test runs** per model for robust evaluation
 - Evaluates on held-out test set
 - Reports mean ± std for test loss and **task-specific metric** (RMSE or AUROC)
@@ -244,12 +203,9 @@ python src/test.py --task classification
 - `diagnostics/{task}/final_test_results.csv` - Test metrics for all models
 - `diagnostics/{task}/final_test_plots/` - Comparative test visualizations
 
-#### 5. Run Tests
-```bash
-# Run all tests with coverage
-
-# View coverage report
-# After running pytest, open htmlcov/index.html in a browser
+### 4. Run Tests
+```powershell
+pytest
 ```
 
 **Test Configuration:**
@@ -258,11 +214,16 @@ python src/test.py --task classification
 - Automatic HTML report generation in `htmlcov/`
 
 **Test Coverage:**
-- **layers.py**: 100% coverage - All GNN layer types tested
-- **models.py**: 100% coverage - All model architectures tested
-- **35 tests total** covering:
-  - Custom GNN layers: GCNConv, GATConv, MessagePassing (15 tests)
-  - Model architectures: VAE, FCNN, GNN, Transformer, FP (20 tests)
+- **layers.py**: 100% coverage (41 statements)
+- **models.py**: 100% coverage (148 statements)  
+- **utils.py**: 87% coverage (217 statements)
+- **87 tests total** covering:
+  - Loss functions (DataDrivenLoss, WeightedBCELoss)
+  - Dataset loading and preprocessing
+  - Custom GNN layers and pooling operations
+  - All model architectures (VAE, FCNN, GNN variants, Transformer, FP)
+  - Save/load utilities
+  - Edge cases and error handling
 - HTML coverage report: `htmlcov/index.html`
 
 ## Model Architecture Details
@@ -310,48 +271,3 @@ python src/test.py --task classification
   - **Regression**: Weighted RMSE - penalizes errors on non-zero targets more than zero targets
   - **Classification**: Weighted BCE - penalizes false positives (predicting 1 when true is 0) less than false negatives
   - Both use α=0.03 to handle 95% sparsity (only ~5% of pairs have associations)
-
-## Experimental Design
-
-### Multiple Runs for Statistical Robustness
-- **Training**: 3 runs per hyperparameter configuration
-  - Reports: mean ± std validation loss
-  - Selects best config based on **mean** validation loss
-- **Testing**: 5 runs per best model
-  - Reports: mean ± std test loss and task-specific metric (RMSE or AUROC)
-  - Provides confidence intervals for model comparison
-
-### No Early Stopping
-- Models are trained for fixed number of epochs
-- **Final model** (last epoch) is saved and used for evaluation
-- This ensures consistent training across all runs
-- Simpler and more reproducible than early stopping
-
-### Reproducibility
-- Fixed random seeds (42) throughout pipeline
-- All hyperparameters logged in `specs.json`
-- Model architectures saved as text summaries
-- Complete experiment tracking for reproducibility
-
-## Results Interpretation
-
-### Key Metrics
-- **Validation Loss**: Used for hyperparameter selection (lower is better for both tasks)
-- **Test Loss**: Final model performance on held-out data
-- **Regression Metric**: RMSE (Root Mean Squared Error) - lower is better
-- **Classification Metric**: AUROC (Area Under ROC Curve) - higher is better (range: 0-1)
-- **Statistical Significance**: Error bars show std across multiple runs
-
-### Expected Outputs
-After running the full pipeline, you can compare:
-1. Model ranking by test performance (task-specific metric)
-2. Trade-offs between model complexity and accuracy
-3. Impact of hyperparameters on each model type
-4. Prediction distributions (KDE plots)
-5. Regression vs Classification performance differences
-
-## Hardware Requirements
-- **GPU**: Recommended for faster training (CUDA-compatible NVIDIA GPU)
-- **CPU**: Works but significantly slower
-- **RAM**: 8GB+ recommended
-- **Storage**: ~500MB for models and results (depends on grid search size)
