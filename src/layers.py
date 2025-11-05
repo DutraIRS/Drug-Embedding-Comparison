@@ -115,7 +115,8 @@ class MessagePassing(nn.Module):
         
         from src import models # This is here to prevent circular import, sorry
         
-        self.MLP = models.FCNN(input_dim, hidden_dim, num_hidden, output_dim, activation)
+        # Use pooling="none" because MessagePassing needs node-level outputs for matrix multiplication
+        self.MLP = models.FCNN(input_dim, hidden_dim, num_hidden, output_dim, activation, pooling="none")
     
     def forward(self, X: torch.Tensor, A: torch.Tensor) -> torch.Tensor:
         """Forward pass of the MessagePassing layer

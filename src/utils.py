@@ -401,8 +401,6 @@ def save_preds_kde(model: nn.Module, model_name: str, loader: DataLoader,
                     y_pred = model(smile)
                 else:
                     y_pred = model(x, a)
-                    if y_pred.dim() == 2:  # (num_atoms, 994)
-                        y_pred = y_pred.sum(dim=0)  # (994,)
                 
                 # Ensure y_pred is 1D with shape (994,)
                 if y_pred.dim() == 0:

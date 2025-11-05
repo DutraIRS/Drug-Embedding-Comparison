@@ -24,18 +24,26 @@ class TestVAE:
         Test the forward pass of the VAE model
         """
         model = models.VAE(input_dim=128, hidden_dim=64, latent_dim=8)
-        x = torch.randn(50, 128)
         
-        x_reconstructed, y, mu, logvar = model(x)
+        # Test with batch (batch_size, input_dim)
+        x_batch = torch.randn(50, 128)
+        x_reconstructed, y, mu, logvar = model(x_batch)
         
         assert isinstance(x_reconstructed, torch.Tensor)
         assert x_reconstructed.shape == (50, 128)
         assert isinstance(y, torch.Tensor)
-        assert y.shape == (50, 994) or y.shape == (994,)  # Batch or single prediction
+        assert y.shape == (50, 994), f"Expected shape (50, 994) but got {y.shape}"  # Batch output
         assert isinstance(mu, torch.Tensor)
         assert mu.shape == (50, 8)
         assert isinstance(logvar, torch.Tensor)
         assert logvar.shape == (50, 8)
+        
+        # Test with single sample (1, input_dim) - as used in training
+        x_single = torch.randn(1, 128)
+        x_reconstructed_single, y_single, mu_single, logvar_single = model(x_single)
+        
+        assert isinstance(y_single, torch.Tensor)
+        assert y_single.shape == (994,), f"Expected shape (994,) but got {y_single.shape}"  # Single output after squeeze
     
     def test_model_number_of_parameters(self):
         """
@@ -60,30 +68,50 @@ class TestFCNN:
     
     def test_forward(self):
         """
-        Test the forward pass of the FCNN model
+        Test the forward pass of the FCNN model with pooling
         """
+        # Test with default pooling (sum)
         model = models.FCNN(input_dim=10, hidden_dim=5, num_hidden=2, output_dim=1)
         
         x = torch.rand(5, 10)
         y = model(x)
         
-        assert y.shape == (5, 1)
+        assert y.shape == (1,)  # Pooled output
         assert y.dtype == torch.float32
         assert isinstance(y, torch.Tensor)
+        
+        # Test with no pooling
+        model_no_pool = models.FCNN(input_dim=10, hidden_dim=5, num_hidden=2, output_dim=1, pooling="none")
+        y_no_pool = model_no_pool(x)
+        
+        assert y_no_pool.shape == (5, 1)  # No pooling
+        assert y_no_pool.dtype == torch.float32
+        assert isinstance(y_no_pool, torch.Tensor)
     
     def test_forward_with_activation(self):
         """
         Test the forward pass of the FCNN model with activation function
         """
+        # Test with pooling
         model = models.FCNN(input_dim=10, hidden_dim=5, num_hidden=2, output_dim=1, activation=models.nn.ReLU())
         
         x = torch.rand(500, 10)
         y = model(x)
         
-        assert y.shape == (500, 1)
+        assert y.shape == (1,)  # Pooled output
         assert y.dtype == torch.float32
         assert isinstance(y, torch.Tensor)
         assert torch.all(y >= 0)
+        
+        # Test with no pooling
+        model_no_pool = models.FCNN(input_dim=10, hidden_dim=5, num_hidden=2, output_dim=1, 
+                                    activation=models.nn.ReLU(), pooling="none")
+        y_no_pool = model_no_pool(x)
+        
+        assert y_no_pool.shape == (500, 1)  # No pooling
+        assert y_no_pool.dtype == torch.float32
+        assert isinstance(y_no_pool, torch.Tensor)
+        assert torch.all(y_no_pool >= 0)
     
     def test_model_number_of_parameters(self):
         """
@@ -116,25 +144,46 @@ class TestGNN:
         """
         Test the forward pass of the GNN model
         """
-        model_a = models.GNN('GCNConv', 3, 5, 2)
-        model_b = models.GNN("GATConv", 3, 5, 2, hidden_dim=5)
-        model_c = models.GNN("MessagePassing", 3, 5, 2, hidden_dim=5, num_hidden=3, activation=nn.ReLU())
+        # Test with pooling (default behavior)
+        model_a = models.GNN('GCNConv', 3, 5, 2, pooling="sum")
+        model_b = models.GNN("GATConv", 3, 5, 2, hidden_dim=5, pooling="sum")
+        model_c = models.GNN("MessagePassing", 3, 5, 2, hidden_dim=5, num_hidden=3, activation=nn.ReLU(), pooling="sum")
+        
+        # Test without pooling (for backward compatibility)
+        model_a_no_pool = models.GNN('GCNConv', 3, 5, 2, pooling="none")
+        model_b_no_pool = models.GNN("GATConv", 3, 5, 2, hidden_dim=5, pooling="none")
+        model_c_no_pool = models.GNN("MessagePassing", 3, 5, 2, hidden_dim=5, num_hidden=3, activation=nn.ReLU(), pooling="none")
         
         X = torch.randn(7, 5) * 10
         A = torch.eye(7)
 
+        # Test with pooling - should return [output_dim]
         out_a = model_a(X, A)
         out_b = model_b(X, A)
         out_c = model_c(X, A)
         
         assert isinstance(out_a, torch.Tensor)
-        assert out_a.shape == (7, 2)
+        assert out_a.shape == (2,), f"Expected shape (2,) but got {out_a.shape}"
         
         assert isinstance(out_b, torch.Tensor)
-        assert out_b.shape == (7, 2)
+        assert out_b.shape == (2,), f"Expected shape (2,) but got {out_b.shape}"
         
         assert isinstance(out_c, torch.Tensor)
-        assert out_c.shape == (7, 2)
+        assert out_c.shape == (2,), f"Expected shape (2,) but got {out_c.shape}"
+        
+        # Test without pooling - should return [num_nodes, output_dim]
+        out_a_no_pool = model_a_no_pool(X, A)
+        out_b_no_pool = model_b_no_pool(X, A)
+        out_c_no_pool = model_c_no_pool(X, A)
+        
+        assert isinstance(out_a_no_pool, torch.Tensor)
+        assert out_a_no_pool.shape == (7, 2), f"Expected shape (7, 2) but got {out_a_no_pool.shape}"
+        
+        assert isinstance(out_b_no_pool, torch.Tensor)
+        assert out_b_no_pool.shape == (7, 2), f"Expected shape (7, 2) but got {out_b_no_pool.shape}"
+        
+        assert isinstance(out_c_no_pool, torch.Tensor)
+        assert out_c_no_pool.shape == (7, 2), f"Expected shape (7, 2) but got {out_c_no_pool.shape}"
     
     def test_incorrect_arguments(self):
         """

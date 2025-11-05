@@ -210,7 +210,7 @@ def get_model_name(model_type: str, config: dict, lr: float, wd: float) -> str:
     return "_".join(parts)
 
 ### GRID SEARCH ###
-model_types = ["Transformer", "GCN", "GAT", "MPNN", "FP", "FCNN", "VAE"]
+model_types = ["GCN", "GAT", "MPNN", "Transformer", "FP", "FCNN", "VAE"]
 
 for model_type in model_types:
     print(f"\n{'='*50}\nTraining {model_type} models\n{'='*50}")
@@ -293,7 +293,6 @@ for model_type in model_types:
                                 
                                 else:
                                     y_pred = model(x, a)
-                                    y_pred = y_pred.sum(dim=0)
                                     l = loss_fn(y_pred, w)
                                 
                                 epoch_train_loss += l.item()
@@ -332,7 +331,6 @@ for model_type in model_types:
                                     
                                     else:
                                         y_pred = model(x, a)
-                                        y_pred = y_pred.sum(dim=0)
                                         l = loss_fn(y_pred, w)
                                     
                                     epoch_val_loss += l.item()
@@ -348,9 +346,10 @@ for model_type in model_types:
                         train_losses.append(epoch_train_loss)
                         val_losses.append(epoch_val_loss)
                         
-                        print(f"  Epoch {epoch+1}/{EPOCHS} - "
-                            f"Train Loss: {epoch_train_loss:.8f} - "
-                            f"Val Loss: {epoch_val_loss:.8f}")
+                        if (epoch + 1) % 100 == 0 or epoch == 0:
+                            print(f"  Epoch {epoch+1}/{EPOCHS} - "
+                                f"Train Loss: {epoch_train_loss:.8f} - "
+                                f"Val Loss: {epoch_val_loss:.8f}")
                     
                     # Save final model (after all epochs)
                     save_model(model_name, model, task=TASK)

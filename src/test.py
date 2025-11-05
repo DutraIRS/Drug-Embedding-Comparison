@@ -240,7 +240,6 @@ for idx, row in best_configs.iterrows():
                     
                     else:
                         y_pred = model(x, a)
-                        y_pred = y_pred.sum(dim=0)
                         l = loss_fn(y_pred, w)
                     
                     epoch_train_loss += l.item()
@@ -300,7 +299,6 @@ for idx, row in best_configs.iterrows():
                     
                     else:
                         y_pred = model(x, a)
-                        y_pred = y_pred.sum(dim=0)
                         l = loss_fn(y_pred, w)
                     
                     test_loss += l.item()

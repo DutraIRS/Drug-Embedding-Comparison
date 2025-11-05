@@ -43,7 +43,9 @@ class VAE(nn.Module):
         self.fc7 = nn.Linear(hidden_dim, input_dim)
         self.fc8 = nn.Linear(input_dim, input_dim)
         
-        self.predictor = FCNN(input_dim=latent_dim, hidden_dim=64, num_hidden=3, output_dim=994, activation=nn.ReLU())
+        # Predictor - no pooling since we want per-sample predictions
+        self.predictor = FCNN(input_dim=latent_dim, hidden_dim=64, num_hidden=3, output_dim=994, 
+                             activation=nn.ReLU(), pooling="none")
     
     def encode(self, X: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         """Encode the input tensor
@@ -96,14 +98,15 @@ class VAE(nn.Module):
         
         return h
 
-    def forward(self, X: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    def forward(self, X: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
         """Forward pass
 
         Args:
-            X (torch.Tensor): Input tensor
+            X (torch.Tensor): Input tensor of shape [batch_size, input_dim] or [input_dim]
 
         Returns:
-            y (torch.Tensor): Reconstructed input tensor
+            X_reconstructed (torch.Tensor): Reconstructed input tensor, same shape as input
+            y (torch.Tensor): Predictions of shape [output_dim]
             mu (torch.Tensor): Mean of latent space
             logvar (torch.Tensor): Log variance of latent space
         """
@@ -112,6 +115,11 @@ class VAE(nn.Module):
         X_reconstructed = self.decode(z)
         
         y = self.predictor(z)
+        
+        # Ensure output is [output_dim] for single samples, [batch_size, output_dim] for batches
+        # In training/test, we process one molecule at a time, so squeeze single-sample batches
+        if y.dim() > 1 and y.size(0) == 1:
+            y = y.squeeze(0)  # [1, 994] -> [994]
 
         return X_reconstructed, y, mu, logvar
 
@@ -155,7 +163,8 @@ class Transformer(nn.Module):
             hidden_dim=d_model,
             num_hidden=2,
             output_dim=output_dim,
-            activation=nn.Identity()
+            activation=nn.Identity(),
+            pooling="none"  # No pooling needed, input is already a single vector
         )
     
     def forward(self, X: torch.Tensor, A: torch.Tensor = None) -> torch.Tensor:
@@ -185,8 +194,10 @@ class Transformer(nn.Module):
         X = X.mean(dim=1)  # [1, d_model]
         X = X.squeeze(0)  # [d_model]
         
-        # Prediction head
-        y = self.prediction_head(X)  # [output_dim]
+        # Prediction head - unsqueeze to add batch/node dimension for FCNN
+        X = X.unsqueeze(0)  # [1, d_model]
+        y = self.prediction_head(X)  # [1, output_dim] with pooling="none"
+        y = y.squeeze(0)  # [output_dim]
         
         return y
 
@@ -194,7 +205,7 @@ class GNN(nn.Module):
     """Graph Neural Network
     """
     def __init__(self, layer: Literal["GCNConv", "GATConv", "MessagePassing"],
-                num_layers: int, input_dim: int, output_dim: int, **kwargs):
+                num_layers: int, input_dim: int, output_dim: int, pooling: str = "sum", **kwargs):
         """Initialize a GNN model with specified type of layer
 
         Args:
@@ -202,6 +213,7 @@ class GNN(nn.Module):
             num_layers (int): Number of layers to chain
             input_dim (int): Initial number of features in each node
             output_dim (int): Final number of features in each node
+            pooling (str, optional): Pooling method to aggregate node features ("sum", "mean", "max", "none"). Defaults to "sum".
         
         Kwargs:
             hidden_dim (int): Size of the hidden layer(s) for each GNN layer. Used for GATConv and MessagePassing
@@ -209,6 +221,8 @@ class GNN(nn.Module):
             activation (nn.Module): Activation function for the output layer of each GNN layer
         """
         super(GNN, self).__init__()
+        
+        self.pooling = pooling
         
         self.layers = nn.ModuleList()
         
@@ -262,10 +276,23 @@ class GNN(nn.Module):
             A (torch.Tensor): Adjacency matrix of shape [num_nodes, num_nodes]
 
         Returns:
-            torch.Tensor: Output graph of shape [num_nodes, output_dim]
+            torch.Tensor: Output of shape [output_dim] if pooling is applied, 
+                         or [num_nodes, output_dim] if pooling="none"
         """
         for layer in self.layers:
             X = layer(X, A)
+        
+        # Apply pooling to aggregate node features
+        if self.pooling == "sum":
+            X = X.sum(dim=0)  # [num_nodes, output_dim] -> [output_dim]
+        elif self.pooling == "mean":
+            X = X.mean(dim=0)  # [num_nodes, output_dim] -> [output_dim]
+        elif self.pooling == "max":
+            X = X.max(dim=0)[0]  # [num_nodes, output_dim] -> [output_dim]
+        elif self.pooling == "none":
+            pass  # Keep [num_nodes, output_dim]
+        else:
+            raise ValueError(f"Unknown pooling method: {self.pooling}")
         
         return X
 
@@ -315,10 +342,10 @@ class FP(nn.Module):
         return y
 
 class FCNN(nn.Module):
-    """Fully Connected Neural Network
+    """Fully Connected Neural Network with graph pooling
     """
     def __init__(self, input_dim: int = 10, hidden_dim: int = 5, num_hidden: int = 2,
-                output_dim: int = 1, activation: nn.Module = nn.Identity()):
+                output_dim: int = 1, activation: nn.Module = nn.Identity(), pooling: str = "sum"):
         """Initialize the FCNN model
 
         Args:
@@ -327,8 +354,10 @@ class FCNN(nn.Module):
             num_hidden (int, optional): Number of hidden layers. Defaults to 2.
             output_dim (int, optional): Size of the output tensor. Defaults to 1.
             activation (nn.Module, optional): Activation function for the output layer. Defaults to nn.Identity().
+            pooling (str, optional): Pooling method for graph-level prediction. Options: "sum", "mean", "max", "none". Defaults to "sum".
         """
         super(FCNN, self).__init__()
+        self.pooling = pooling
         self.layers = nn.ModuleList()
         
         self.layers.append(nn.Linear(input_dim, hidden_dim))
@@ -345,12 +374,25 @@ class FCNN(nn.Module):
         """Forward pass of the FCNN model
 
         Args:
-            X (torch.Tensor): Input tensor
+            X (torch.Tensor): Input node features [num_nodes, input_dim]
+            A (torch.Tensor, optional): Adjacency matrix (unused, for API compatibility)
 
         Returns:
-            torch.Tensor: Output tensor
+            torch.Tensor: Output tensor [output_dim] after pooling, or [num_nodes, output_dim] if pooling="none"
         """
         for layer in self.layers:
             X = layer(X)
+        
+        # Apply pooling for graph-level prediction
+        if self.pooling == "sum":
+            X = X.sum(dim=0)
+        elif self.pooling == "mean":
+            X = X.mean(dim=0)
+        elif self.pooling == "max":
+            X = X.max(dim=0)[0]
+        elif self.pooling == "none":
+            pass  # Return node-level predictions
+        else:
+            raise ValueError(f"Invalid pooling method: {self.pooling}. Use 'sum', 'mean', 'max', or 'none'.")
         
         return X
