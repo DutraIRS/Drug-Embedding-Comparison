@@ -11,6 +11,7 @@ import argparse
 
 from torchinfo import summary
 from itertools import product
+from sklearn.metrics import roc_auc_score
 
 from src.utils import *
 from src.models import VAE, GNN, FP, FCNN, Transformer
@@ -51,7 +52,7 @@ input_dim = sample_X.size(1)
 
 # General hyperparameters (all models)
 general_configs = {
-    'learning_rates': [1e-5, 1e-4, 1e-3],
+    'learning_rates': [1e-4, 1e-3],
     'weight_decays': [1e-6, 1e-4, 1e-2],
 }
 
@@ -59,26 +60,26 @@ general_configs = {
 model_specific_configs = {
     'VAE': {
         'latent_dim': [8, 16],
-        'hidden_dim': [64, 128],
-        'reconstruction_beta': [0.01, 0.1]
+        'hidden_dim': [64],
+        'reconstruction_beta': [0.001, 0.01, 0.1]
     },
     'GCN': {
         'num_layers': [3, 5],
     },
     'GAT': {
         'num_layers': [3, 5],
-        'hidden_dim': [64, 128],
+        'hidden_dim': [64],
     },
     'MPNN': {
         'num_layers': [3, 5],
-        'hidden_dim': [64, 128],
+        'hidden_dim': [64],
         'num_hidden': [2, 3]
     },
     'Transformer': {
-        'num_layers': [3, 6],
-        'd_model': [64, 128],
+        'num_layers': [3, 5],
+        'd_model': [64],
         'nhead': [4, 8],
-        'dim_feedforward': [128, 256]
+        'dim_feedforward': [64]
     },
     'FP': {
         'radius': [2, 3],
@@ -120,7 +121,8 @@ def create_model(model_type: str, config: dict, input_dim: int, output_dim: int 
             layer="GCNConv",
             num_layers=config['num_layers'],
             input_dim=input_dim,
-            output_dim=output_dim
+            output_dim=output_dim,
+            activation=nn.Identity()
         )
     
     elif model_type == "GAT":
@@ -140,7 +142,7 @@ def create_model(model_type: str, config: dict, input_dim: int, output_dim: int 
             output_dim=output_dim,
             hidden_dim=config['hidden_dim'],
             num_hidden=config['num_hidden'],
-            activation=nn.ReLU()
+            activation=nn.Identity()
         )
     
     elif model_type == "Transformer":
@@ -166,7 +168,7 @@ def create_model(model_type: str, config: dict, input_dim: int, output_dim: int 
             hidden_dim=config['hidden_dim'],
             num_hidden=config['num_layers'],
             output_dim=output_dim,
-            activation=nn.ReLU()
+            activation=nn.Identity()
         )
     
     else:
@@ -352,7 +354,7 @@ for model_type in model_types:
                                 f"Val Loss: {epoch_val_loss:.8f}")
                     
                     # Save final model (after all epochs)
-                    save_model(model_name, model, task=TASK)
+                    # save_model(model_name, model, task=TASK)
                     
                     # Save and plot losses (after all epochs)
                     save_losses(model_name, train_losses, val_losses, task=TASK)

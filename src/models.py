@@ -45,7 +45,7 @@ class VAE(nn.Module):
         
         # Predictor - no pooling since we want per-sample predictions
         self.predictor = FCNN(input_dim=latent_dim, hidden_dim=64, num_hidden=3, output_dim=994, 
-                             activation=nn.ReLU(), pooling="none")
+                             activation=nn.Identity(), pooling="none")
     
     def encode(self, X: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
         """Encode the input tensor
@@ -227,13 +227,16 @@ class GNN(nn.Module):
         self.layers = nn.ModuleList()
         
         if layer == "GCNConv":
+            # Use Identity activation for output layer (last layer will be modified below)
+            activation_fn = kwargs.get('activation', nn.Identity())
+            
             self.layers.append(
-                    GCNConv(input_dim, output_dim)
+                    GCNConv(input_dim, output_dim, activation=activation_fn)
                 )
             
             for _ in range(num_layers - 1):
                 self.layers.append(
-                    GCNConv(output_dim, output_dim)
+                    GCNConv(output_dim, output_dim, activation=activation_fn)
                 )
         elif layer == "GATConv":
             if 'hidden_dim' not in kwargs.keys():

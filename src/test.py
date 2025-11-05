@@ -255,7 +255,7 @@ for idx, row in best_configs.iterrows():
             
             train_losses.append(epoch_train_loss)
             
-            if (epoch + 1) % 10 == 0:
+            if (epoch + 1) % 100 == 0 or epoch == 0:
                 print(f"Epoch {epoch+1}/{EPOCHS} - Train Loss: {epoch_train_loss:.4f}")
         
         # End timing training
