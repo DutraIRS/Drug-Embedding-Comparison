@@ -162,43 +162,6 @@ def create_visualizations(df: pd.DataFrame, best_configs: pd.DataFrame) -> None:
     
     print(f"\nVisualizations saved to {plot_dir}/")
 
-def print_summary(df, best_configs):
-    """
-    Print summary statistics
-    
-    Args:
-        df (pd.DataFrame): DataFrame with all results
-        best_configs (pd.DataFrame): DataFrame with best configurations
-    """
-    print("\n" + "="*80)
-    print("TRAINING RESULTS SUMMARY")
-    print("="*80)
-    
-    print(f"\nTotal models trained: {len(df)}")
-    print(f"Model types: {df['model_type'].nunique()}")
-    print(f"Model types list: {', '.join(df['model_type'].unique())}")
-    
-    print("\n" + "-"*80)
-    print("BEST CONFIGURATION FOR EACH MODEL TYPE")
-    print("-"*80)
-    
-    # Display best configs with selected columns
-    display_cols = ['model_type', 'model_name', 'best_val_loss', 'n_parameters', 
-                    'learning_rate', 'weight_decay']
-    
-    # Add model-specific hyperparameters if they exist
-    for col in best_configs.columns:
-        if col not in display_cols and col not in ['model_architecture']:
-            display_cols.append(col)
-    
-    # Filter to only existing columns
-    display_cols = [col for col in display_cols if col in best_configs.columns]
-    
-    print(best_configs[display_cols].to_string(index=False))
-    
-    print("\n" + "-"*80)
-
-
 def print_summary(df: pd.DataFrame, best_configs: pd.DataFrame) -> None:
     """
     Print summary of all results and best configurations
