@@ -150,8 +150,7 @@ def create_model_from_config(row: pd.Series, input_dim: int, output_dim: int = 9
             input_dim=input_dim,
             output_dim=output_dim,
             hidden_dim=int(row['hidden_dim']),
-            num_hidden=int(row['num_hidden']),
-            activation=nn.ReLU()
+            num_hidden=int(row['num_hidden'])
         )
     
     elif model_type == "Transformer":
@@ -176,8 +175,7 @@ def create_model_from_config(row: pd.Series, input_dim: int, output_dim: int = 9
             input_dim=input_dim,
             hidden_dim=int(row['hidden_dim']),
             num_hidden=int(row['num_layers']),
-            output_dim=output_dim,
-            activation=nn.ReLU()
+            output_dim=output_dim
         )
     
     else:
@@ -257,9 +255,6 @@ for idx, row in best_configs.iterrows():
             # Average over drugs in loader
             epoch_train_loss /= len(train_val_loader.dataset)
             
-            # Average over side effects
-            epoch_train_loss /= len(w)
-            
             train_losses.append(epoch_train_loss)
             
             if (epoch + 1) % 100 == 0 or epoch == 0:
@@ -321,7 +316,6 @@ for idx, row in best_configs.iterrows():
             
             # Average test loss
             test_loss /= len(test_loader.dataset)
-            test_loss /= len(w)
             
             # Calculate metric (AUROC for classification, RMSE for regression)
             all_preds = np.vstack(all_preds)  # Stack to shape (n_samples, 994)

@@ -227,46 +227,67 @@ class GNN(nn.Module):
         self.layers = nn.ModuleList()
         
         if layer == "GCNConv":
-            # Use Identity activation for output layer (last layer will be modified below)
-            activation_fn = kwargs.get('activation', nn.Identity())
-            
+            # First layer: input_dim -> output_dim with ReLU
             self.layers.append(
-                    GCNConv(input_dim, output_dim, activation=activation_fn)
+                    GCNConv(input_dim, output_dim, activation=nn.ReLU())
                 )
             
-            for _ in range(num_layers - 1):
+            # Intermediate layers: output_dim -> output_dim with ReLU
+            for _ in range(num_layers - 2):
                 self.layers.append(
-                    GCNConv(output_dim, output_dim, activation=activation_fn)
+                    GCNConv(output_dim, output_dim, activation=nn.ReLU())
+                )
+            
+            # Last layer: output_dim -> output_dim with Identity
+            if num_layers > 1:
+                self.layers.append(
+                    GCNConv(output_dim, output_dim, activation=nn.Identity())
                 )
         elif layer == "GATConv":
             if 'hidden_dim' not in kwargs.keys():
                 raise TypeError("GATConv layer requires kwarg 'hidden_dim'")
             
+            # First layer: input_dim -> output_dim with ReLU
             self.layers.append(
-                    GATConv(input_dim, output_dim, kwargs['hidden_dim'])
+                    GATConv(input_dim, output_dim, kwargs['hidden_dim'], activation=nn.ReLU())
                 )
             
-            for _ in range(num_layers - 1):
+            # Intermediate layers: output_dim -> output_dim with ReLU
+            for _ in range(num_layers - 2):
                 self.layers.append(
-                    GATConv(output_dim, output_dim, kwargs['hidden_dim'])
+                    GATConv(output_dim, output_dim, kwargs['hidden_dim'], activation=nn.ReLU())
+                )
+            
+            # Last layer: output_dim -> output_dim with Identity
+            if num_layers > 1:
+                self.layers.append(
+                    GATConv(output_dim, output_dim, kwargs['hidden_dim'], activation=nn.Identity())
                 )
         elif layer == "MessagePassing":
             if 'hidden_dim' not in kwargs.keys():
                 raise TypeError("MessagePassing layer requires kwarg 'hidden_dim'")
             if 'num_hidden' not in kwargs.keys():
                 raise TypeError("MessagePassing layer requires kwarg 'num_hidden'")
-            if 'activation' not in kwargs.keys():
-                raise TypeError("MessagePassing layer requires kwarg 'activation'")
+            # Note: 'activation' kwarg is ignored - we control it here for proper ReLU/Identity pattern
             
+            # First layer: input_dim -> output_dim with ReLU
             self.layers.append(
                     MessagePassing(input_dim, kwargs["hidden_dim"],
-                        kwargs["num_hidden"], output_dim, kwargs["activation"])
+                        kwargs["num_hidden"], output_dim, activation=nn.ReLU())
                 )
             
-            for _ in range(num_layers - 1):
+            # Intermediate layers: output_dim -> output_dim with ReLU
+            for _ in range(num_layers - 2):
                 self.layers.append(
                     MessagePassing(output_dim, kwargs["hidden_dim"],
-                        kwargs["num_hidden"], output_dim, kwargs["activation"])
+                        kwargs["num_hidden"], output_dim, activation=nn.ReLU())
+                )
+            
+            # Last layer: output_dim -> output_dim with Identity
+            if num_layers > 1:
+                self.layers.append(
+                    MessagePassing(output_dim, kwargs["hidden_dim"],
+                        kwargs["num_hidden"], output_dim, activation=nn.Identity())
                 )
         else:
             raise ValueError("Layer type not implemented")

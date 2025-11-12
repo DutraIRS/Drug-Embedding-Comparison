@@ -41,19 +41,21 @@ class GCNConv(nn.Module):
 class GATConv(nn.Module):
     """Graph Self-Attention Convolutional Layer
     """
-    def __init__(self, input_dim: int, output_dim: int, hidden_dim: int):
+    def __init__(self, input_dim: int, output_dim: int, hidden_dim: int, activation: nn.Module = nn.ReLU()):
         """Initialize the GATConv layer
 
         Args:
             input_dim (int): Number of features in input graph
             output_dim (int): Number of features in output graph
             hidden_dim (int): Dimension of Wq and Wk weight tensors
+            activation (nn.Module, optional): Activation function. Defaults to nn.ReLU().
         """
         super(GATConv, self).__init__()
         
         self.input_dim = input_dim
         self.output_dim = output_dim
         self.hidden_dim = hidden_dim
+        self.activation = activation
         
         # Initialize weights from a normal distribution with 0 mean and low variance
         self.Wq = nn.Parameter(torch.randn([input_dim, hidden_dim]) / 10)
@@ -96,7 +98,8 @@ class GATConv(nn.Module):
         K = X @ self.Wk
         V = X @ self.Wv
         
-        return self.masked_attention(Q, K, V, A)
+        X_out = self.masked_attention(Q, K, V, A)
+        return self.activation(X_out)
 
 class MessagePassing(nn.Module):
     """Deep Message Passing Layer

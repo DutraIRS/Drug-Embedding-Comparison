@@ -72,7 +72,6 @@ class TestModelOutputConsistency:
             output_dim=test_data['output_dim'],
             hidden_dim=64,
             num_hidden=2,
-            activation=nn.ReLU(),
             pooling="sum"
         )
         model.eval()
@@ -257,21 +256,21 @@ class TestGNNPoolingEdgeCases:
                 num_layers=2,
                 input_dim=test_data['input_dim'],
                 output_dim=test_data['output_dim'],
-                hidden_dim=32,
-                activation=nn.ReLU()
+                hidden_dim=32
             )
     
     def test_gnn_missing_activation_mpnn(self, test_data):
-        """Test that MessagePassing requires activation"""
-        with pytest.raises(TypeError, match="MessagePassing layer requires kwarg 'activation'"):
-            model = GNN(
-                layer="MessagePassing",
-                num_layers=2,
-                input_dim=test_data['input_dim'],
-                output_dim=test_data['output_dim'],
-                hidden_dim=32,
-                num_hidden=2
-            )
+        """Test that MessagePassing no longer requires activation (controlled internally)"""
+        # This should work now - activation is controlled internally
+        model = GNN(
+            layer="MessagePassing",
+            num_layers=2,
+            input_dim=test_data['input_dim'],
+            output_dim=test_data['output_dim'],
+            hidden_dim=32,
+            num_hidden=2
+        )
+        assert isinstance(model, GNN)
 
 
 class TestVAEComponents:

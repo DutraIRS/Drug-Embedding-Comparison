@@ -29,8 +29,8 @@ FILE_PATH = './data/R_100.csv'
 VAL_RATIO = 0.2
 TEST_RATIO = 0.2
 BATCH_SIZE = 64
-EPOCHS = 500
-N_RUNS = 3
+EPOCHS = 300
+N_RUNS = 2
 
 ### SETUP ###
 device = (
@@ -121,8 +121,7 @@ def create_model(model_type: str, config: dict, input_dim: int, output_dim: int 
             layer="GCNConv",
             num_layers=config['num_layers'],
             input_dim=input_dim,
-            output_dim=output_dim,
-            activation=nn.Identity()
+            output_dim=output_dim
         )
     
     elif model_type == "GAT":
@@ -141,8 +140,7 @@ def create_model(model_type: str, config: dict, input_dim: int, output_dim: int 
             input_dim=input_dim,
             output_dim=output_dim,
             hidden_dim=config['hidden_dim'],
-            num_hidden=config['num_hidden'],
-            activation=nn.Identity()
+            num_hidden=config['num_hidden']
         )
     
     elif model_type == "Transformer":
@@ -167,8 +165,7 @@ def create_model(model_type: str, config: dict, input_dim: int, output_dim: int 
             input_dim=input_dim,
             hidden_dim=config['hidden_dim'],
             num_hidden=config['num_layers'],
-            output_dim=output_dim,
-            activation=nn.Identity()
+            output_dim=output_dim
         )
     
     else:
@@ -329,10 +326,6 @@ for model_type in model_types:
                         epoch_train_loss /= len(train_loader.dataset)
                         epoch_val_loss /= len(val_loader.dataset)
                         
-                        # Average over side effects
-                        epoch_train_loss /= len(w)
-                        epoch_val_loss /= len(w)
-                        
                         train_losses.append(epoch_train_loss)
                         val_losses.append(epoch_val_loss)
                         
@@ -393,33 +386,33 @@ for model_type in model_types:
                 
                 # Calculate statistics across runs
                 val_losses_all_runs = [r['last_val_loss'] for r in run_results]
-            
-            mean_val_loss = np.mean(val_losses_all_runs)
-            std_val_loss = np.std(val_losses_all_runs)
-            
-            print(f'\n  Summary for {base_model_name}:')
-            print(f'    Mean val loss: {mean_val_loss:.4f} ± {std_val_loss:.4f}')
-            print(f'    Individual runs: {[f"{v:.4f}" for v in val_losses_all_runs]}')
-            
-            # Save summary specs for the configuration (average across runs)
-            summary_model_name = base_model_name
-            summary_specs = {
-                'model_name': summary_model_name,
-                'model_type': model_type,
-                'n_parameters': n_params,
-                'mean_val_loss': mean_val_loss,
-                'std_val_loss': std_val_loss,
-                'best_val_loss': min(val_losses_all_runs),
-                'worst_val_loss': max(val_losses_all_runs),
-                'n_runs': N_RUNS,
-                'learning_rate': learning_rate,
-                'weight_decay': weight_decay,
-            }
-            
-            # Add model-specific hyperparameters
-            summary_specs.update(config)
-            
-            # Save summary specs
-            save_specs(summary_model_name, summary_specs, task=TASK)
-            
-            print(f'\n{"="*5} Configuration {base_model_name} complete ({N_RUNS} runs)! {"="*5}\n')
+
+                mean_val_loss = np.mean(val_losses_all_runs)
+                std_val_loss = np.std(val_losses_all_runs)
+
+                print(f'\n  Summary for {base_model_name}:')
+                print(f'    Mean val loss: {mean_val_loss:.4f} ± {std_val_loss:.4f}')
+                print(f'    Individual runs: {[f"{v:.4f}" for v in val_losses_all_runs]}')
+
+                # Save summary specs for the configuration (average across runs)
+                summary_model_name = base_model_name
+                summary_specs = {
+                    'model_name': summary_model_name,
+                    'model_type': model_type,
+                    'n_parameters': n_params,
+                    'mean_val_loss': mean_val_loss,
+                    'std_val_loss': std_val_loss,
+                    'best_val_loss': min(val_losses_all_runs),
+                    'worst_val_loss': max(val_losses_all_runs),
+                    'n_runs': N_RUNS,
+                    'learning_rate': learning_rate,
+                    'weight_decay': weight_decay,
+                }
+
+                # Add model-specific hyperparameters
+                summary_specs.update(config)
+
+                # Save summary specs
+                save_specs(summary_model_name, summary_specs, task=TASK)
+
+                print(f'\n{"="*5} Configuration {base_model_name} complete ({N_RUNS} runs)! {"="*5}\n')

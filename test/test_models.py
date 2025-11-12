@@ -129,7 +129,7 @@ class TestGNN:
         """
         model_a = models.GNN('GCNConv', 3, 5, 2)
         model_b = models.GNN("GATConv", 3, 5, 2, hidden_dim=5)
-        model_c = models.GNN("MessagePassing", 3, 5, 2, hidden_dim=5, num_hidden=3, activation=nn.ReLU())
+        model_c = models.GNN("MessagePassing", 3, 5, 2, hidden_dim=5, num_hidden=3)
         
         assert isinstance(model_a, models.GNN)
         assert isinstance(model_a, models.nn.Module)
@@ -147,12 +147,12 @@ class TestGNN:
         # Test with pooling (default behavior)
         model_a = models.GNN('GCNConv', 3, 5, 2, pooling="sum")
         model_b = models.GNN("GATConv", 3, 5, 2, hidden_dim=5, pooling="sum")
-        model_c = models.GNN("MessagePassing", 3, 5, 2, hidden_dim=5, num_hidden=3, activation=nn.ReLU(), pooling="sum")
+        model_c = models.GNN("MessagePassing", 3, 5, 2, hidden_dim=5, num_hidden=3, pooling="sum")
         
         # Test without pooling (for backward compatibility)
         model_a_no_pool = models.GNN('GCNConv', 3, 5, 2, pooling="none")
         model_b_no_pool = models.GNN("GATConv", 3, 5, 2, hidden_dim=5, pooling="none")
-        model_c_no_pool = models.GNN("MessagePassing", 3, 5, 2, hidden_dim=5, num_hidden=3, activation=nn.ReLU(), pooling="none")
+        model_c_no_pool = models.GNN("MessagePassing", 3, 5, 2, hidden_dim=5, num_hidden=3, pooling="none")
         
         X = torch.randn(7, 5) * 10
         A = torch.eye(7)
@@ -196,13 +196,10 @@ class TestGNN:
             model = models.GNN("GATConv", 3, 5, 2)
         
         with pytest.raises(TypeError):
-            model = models.GNN("MessagePassing", 3, 5, 2, hidden_dim=5, num_hidden=3)
+            model = models.GNN("MessagePassing", 3, 5, 2, hidden_dim=5)
         
         with pytest.raises(TypeError):
-            model = models.GNN("MessagePassing", 3, 5, 2, hidden_dim=5, activation=nn.ReLU())
-        
-        with pytest.raises(TypeError):
-            model = models.GNN("MessagePassing", 3, 5, 2, num_hidden=3, activation=nn.ReLU())
+            model = models.GNN("MessagePassing", 3, 5, 2, num_hidden=3)
 
 
 class TestTransformer:
