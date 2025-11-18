@@ -154,8 +154,8 @@ class TestSaveFunctions:
         val_losses = [0.6, 0.5, 0.4]
         utils.save_losses(model_name, train_losses, val_losses, task="regression")
         
-        # Check if file was created
-        expected_path = f"./saved_models/regression/{model_name}/losses.csv"
+        # Check if plot file was created (save_losses creates plot, not CSV)
+        expected_path = f"./saved_models/regression/{model_name}/loss_plot.png"
         assert os.path.exists(expected_path)
         
         # Cleanup

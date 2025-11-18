@@ -25,9 +25,9 @@ src/
 ├── models.py          # Model architectures (VAE, GNN, Transformer, FP, FCNN)
 ├── layers.py          # Custom GNN layers (GCNConv, GATConv, MessagePassing)
 ├── utils.py           # Data loading, loss functions, saving utilities
-├── train.py           # Grid search training with 3 runs per configuration
+├── train.py           # Grid search training per configuration
 ├── analyze_results.py # Consolidate results and find best configurations
-├── test.py            # Final evaluation on test set with 5 runs per model
+├── test.py            # Final evaluation on test set with 3 runs per model
 └── trim_data.ipynb    # Notebook for data preprocessing and subset creation
 
 test/
@@ -147,9 +147,9 @@ Each pipeline saves results to task-specific directories:
 - Classification: `saved_models/classification/` and `diagnostics/classification/`
 
 Each pipeline will sequentially:
-1. Train all models with grid search (3 runs per configuration)
+1. Train all models with grid search
 2. Analyze results and select best configurations
-3. Test best models on test set (5 runs per model)
+3. Test best models on test set (3 runs per model)
 
 
 **Features:**
@@ -173,8 +173,7 @@ Each pipeline will sequentially:
 **Training Configuration:**
 - Dataset: `data/R_100.csv` (samples with less than 100 atoms)
 - Split: 60% train / 20% val / 20% test
-- Epochs: 500 (configurable via `EPOCHS` variable)
-- Runs per config: 3 (configurable via `N_RUNS`)
+- Epochs: 300
 - Device: CUDA if available, else CPU
 - **Task-specific loss**:
   - Regression: `DataDrivenLoss` (Weighted RMSE with α=0.03)
@@ -193,7 +192,7 @@ Each pipeline will sequentially:
 **Features:**
 - Loads best configurations from `analyze_results.py`
 - Trains each model on combined train+val set for 3000 epochs
-- **5 independent test runs** per model for robust evaluation
+- **3 independent test runs** per model for robust evaluation
 - Evaluates on held-out test set
 - Reports mean ± std for test loss and **task-specific metric** (RMSE or AUROC)
 - Tracks and reports training time for each model
@@ -214,9 +213,9 @@ pytest
 - Automatic HTML report generation in `htmlcov/`
 
 **Test Coverage:**
-- **layers.py**: 100% coverage (41 statements)
-- **models.py**: 100% coverage (148 statements)  
-- **utils.py**: 87% coverage (217 statements)
+- **layers.py**: 100% coverage (43 statements)
+- **models.py**: 100% coverage (151 statements)  
+- **utils.py**: 70% coverage (291 statements)
 - **87 tests total** covering:
   - Loss functions (DataDrivenLoss, WeightedBCELoss)
   - Dataset loading and preprocessing
