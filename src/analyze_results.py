@@ -33,59 +33,31 @@ def collect_all_results() -> pd.DataFrame:
         if not specs_file.exists():
             continue
         
-        try:
-            # Read specs file
-            specs_df = pd.read_csv(specs_file, index_col=0)
-            specs_dict = specs_df['value'].to_dict()
-            
-            # Extract relevant information
-            result = {
-                'model_name': specs_dict.get('model_name', model_dir.name),
-                'model_type': specs_dict.get('model_type', 'unknown'),
-                'n_parameters': int(specs_dict.get('n_parameters', 0)),
-                'best_val_loss': float(specs_dict.get('best_val_loss', specs_dict.get('mean_val_loss', float('inf')))),
-                'mean_val_loss': float(specs_dict.get('mean_val_loss', specs_dict.get('best_val_loss', float('inf')))),
-                'std_val_loss': float(specs_dict.get('std_val_loss', 0)),
-                'learning_rate': float(specs_dict.get('learning_rate', 0)),
-                'weight_decay': float(specs_dict.get('weight_decay', 0)),
-            }
-            
-            # Add model-specific hyperparameters
-            for key, value in specs_dict.items():
-                if key not in result and key != 'model_architecture':
-                    try:
-                        # Try to convert to numeric if possible
-                        result[key] = float(value) if '.' in str(value) else int(value)
-                    except (ValueError, TypeError):
-                        result[key] = value
-            
-            all_results.append(result)
+        # Read specs file
+        specs_df = pd.read_csv(specs_file, index_col=0)
+        specs_dict = specs_df['value'].to_dict()
         
-        except Exception as e:
-            print(f"Error processing {model_dir.name}: {e}")
-            continue
-    
-    return pd.DataFrame(all_results)
+        # Extract relevant information
+        result = {
+            'model_name': specs_dict['model_name'],
+            'model_type': specs_dict['model_type'],
+            'n_parameters': int(specs_dict['n_parameters']),
+            'val_loss': float(specs_dict['val_loss']),
+            'val_metric': float(specs_dict['val_metric'])
+        }
+        
+        # Add model-specific hyperparameters
+        for key, value in specs_dict.items():
+            if key not in result and key != 'model_architecture':
+                try:
+                    # Try to convert to numeric if possible
+                    result[key] = float(value) if '.' in str(value) else int(value)
+                except (ValueError, TypeError):
+                    result[key] = value
+        
+        all_results.append(result)
 
-def find_best_configs(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Find the best configuration for each model type (lowest mean validation loss)
-    
-    Args:
-        df: DataFrame with all results
-    
-    Returns:
-        DataFrame with best configuration for each model type, sorted by performance
-    """
-    # Group by model type and find the one with minimum mean validation loss
-    # Use mean_val_loss if available, otherwise fall back to best_val_loss
-    loss_column = 'mean_val_loss' if 'mean_val_loss' in df.columns else 'best_val_loss'
-    best_configs = df.loc[df.groupby('model_type')[loss_column].idxmin()]
-    
-    # Sort by validation loss
-    best_configs = best_configs.sort_values(loss_column)
-    
-    return best_configs
+    return pd.DataFrame(all_results)
 
 def create_visualizations(df: pd.DataFrame, best_configs: pd.DataFrame) -> None:
     """
@@ -101,22 +73,22 @@ def create_visualizations(df: pd.DataFrame, best_configs: pd.DataFrame) -> None:
     
     # 1. Box plot of validation losses by model type
     plt.figure(figsize=(12, 6))
-    df.boxplot(column='best_val_loss', by='model_type', figsize=(12, 6))
-    plt.title('Validation Loss Distribution by Model Type')
+    df.boxplot(column='val_metric', by='model_type', figsize=(12, 6))
+    plt.title('Validation Metric Distribution by Model Type')
     plt.suptitle('')
     plt.xlabel('Model Type')
-    plt.ylabel('Best Validation Loss')
+    plt.ylabel('Validation Metric')
     plt.xticks(rotation=45)
     plt.tight_layout()
-    plt.savefig(plot_dir / 'val_loss_by_model_type.png', dpi=300)
+    plt.savefig(plot_dir / 'val_metric_by_model_type.png', dpi=300)
     plt.close()
     
     # 2. Bar plot of best configurations
     plt.figure(figsize=(10, 6))
-    plt.barh(best_configs['model_type'], best_configs['best_val_loss'])
-    plt.xlabel('Best Validation Loss')
+    plt.barh(best_configs['model_type'], best_configs['val_metric'])
+    plt.xlabel('Best Validation Metric')
     plt.ylabel('Model Type')
-    plt.title('Best Validation Loss for Each Model Type')
+    plt.title('Validation Metric for Each Model Type')
     plt.tight_layout()
     plt.savefig(plot_dir / 'best_configs_comparison.png', dpi=300)
     plt.close()
@@ -125,11 +97,11 @@ def create_visualizations(df: pd.DataFrame, best_configs: pd.DataFrame) -> None:
     plt.figure(figsize=(10, 6))
     for model_type in df['model_type'].unique():
         subset = df[df['model_type'] == model_type]
-        plt.scatter(subset['n_parameters'], subset['best_val_loss'], 
+        plt.scatter(subset['n_parameters'], subset['val_metric'], 
                    label=model_type, alpha=0.6, s=50)
     
     plt.xlabel('Number of Parameters')
-    plt.ylabel('Best Validation Loss')
+    plt.ylabel('Best Validation Metric')
     plt.title('Model Complexity vs Performance')
     plt.legend()
     plt.grid(True, alpha=0.3)
@@ -137,46 +109,7 @@ def create_visualizations(df: pd.DataFrame, best_configs: pd.DataFrame) -> None:
     plt.savefig(plot_dir / 'params_vs_loss.png', dpi=300)
     plt.close()
     
-    # 4. Heatmap of hyperparameter impact (if enough data)
-    for model_type in df['model_type'].unique():
-        subset = df[df['model_type'] == model_type]
-        if len(subset) < 4:
-            continue
-        
-        # Create pivot table for learning rate vs weight decay
-        if 'learning_rate' in subset.columns and 'weight_decay' in subset.columns:
-            pivot = subset.pivot_table(
-                values='best_val_loss',
-                index='learning_rate',
-                columns='weight_decay',
-                aggfunc='min'
-            )
-            
-            if not pivot.empty:
-                plt.figure(figsize=(10, 6))
-                sns.heatmap(pivot, annot=True, fmt='.4f', cmap='viridis')
-                plt.title(f'{model_type}: Learning Rate vs Weight Decay Impact')
-                plt.tight_layout()
-                plt.savefig(plot_dir / f'{model_type}_lr_wd_heatmap.png', dpi=300)
-                plt.close()
-    
     print(f"\nVisualizations saved to {plot_dir}/")
-
-def print_summary(df: pd.DataFrame, best_configs: pd.DataFrame) -> None:
-    """
-    Print summary of all results and best configurations
-    
-    Args:
-        df: DataFrame with all training results
-        best_configs: DataFrame with best configuration per model type
-    """
-    print("OVERALL STATISTICS")
-    print("-"*80)
-    print(f"Best overall model: {best_configs.iloc[0]['model_name']}")
-    print(f"Best validation loss: {best_configs.iloc[0]['best_val_loss']:.6f}")
-    print(f"Mean validation loss: {df['best_val_loss'].mean():.6f}")
-    print(f"Std validation loss: {df['best_val_loss'].std():.6f}")
-    print("="*80 + "\n")
 
 def main() -> None:
     """
@@ -204,15 +137,10 @@ def main() -> None:
     print(f"Collecting results from all trained models in {MODEL_FOLDER}...")
     df = collect_all_results()
     
-    if df.empty:
-        print(f"No results found in {MODEL_FOLDER}. Make sure models have been trained and saved.")
-        return
-    
     print(f"Found {len(df)} trained models.")
     
     # Find best configurations
-    print("\nFinding best configuration for each model type...")
-    best_configs = find_best_configs(df)
+    best_configs = df.loc[df.groupby('model_type')['val_metric'].idxmin()]
     
     # Create diagnostics folder if it doesn't exist
     os.makedirs(DIAGNOSTICS_FOLDER, exist_ok=True)
@@ -224,9 +152,6 @@ def main() -> None:
     # Create visualizations
     print("\nCreating visualizations...")
     create_visualizations(df, best_configs)
-    
-    # Print summary
-    print_summary(df, best_configs)
     
     # Save full results too
     full_results_file = Path(DIAGNOSTICS_FOLDER) / "all_results.csv"

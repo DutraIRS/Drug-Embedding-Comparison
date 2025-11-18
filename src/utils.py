@@ -6,12 +6,16 @@ import pandas as pd
 import seaborn as sns
 import matplotlib.pyplot as plt
 
+from sklearn.metrics import roc_auc_score
+
 from rdkit import Chem
 
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.utils.data import Dataset, DataLoader, random_split
+
+from src.models import *
 
 ### Random number generator seed
 RANDOM_STATE = 42
@@ -300,7 +304,7 @@ def save_model(name: str, model: nn.Module, task: str = "regression") -> None:
 
 def save_losses(name: str, train_losses: list[float], val_losses: list[float] = None, task: str = "regression"):
     """
-    Save losses to CSV and generate training curves plot
+    Generate and save training curves plot
     
     Args:
         name: Model name
@@ -311,18 +315,8 @@ def save_losses(name: str, train_losses: list[float], val_losses: list[float] = 
     folder_path = os.path.join(MODEL_FOLDER, task, name)
     if not os.path.exists(folder_path):
         os.makedirs(folder_path)
-    
-    # Save losses to CSV
-    losses_path = os.path.join(folder_path, 'losses.csv')
-    data_dict = {'train_losses': train_losses}
-    
-    if val_losses is not None and len(val_losses) > 0:
-        data_dict['val_losses'] = val_losses
-    
-    losses_df = pd.DataFrame(data_dict)
-    losses_df.to_csv(losses_path, index=False)
 
-    # Plot only train and validation losses
+    # Plot train and validation losses
     plt.figure(figsize=(10, 6))
     plt.plot(train_losses, label='Train Loss', linewidth=2, color='tab:blue')
     if val_losses and len(val_losses) > 0:
@@ -453,6 +447,25 @@ def save_preds_kde(model: nn.Module, model_name: str, loader: DataLoader,
         plt.legend()
         plt.savefig(os.path.join(MODEL_FOLDER, task, model_name, f'kde_plot_{split}.png'))
         plt.close()
+        
+        preds = {key: np.array(value).round() for key, value in preds.items()}
+        
+        confusion_matrix = np.zeros((len(preds), len(preds)))
+        for i in range(len(preds)):
+            y = preds[i]
+            
+            for j in range(len(preds)):
+                confusion_matrix[i, j] = y[y == j].shape[0]
+            
+            confusion_matrix[i, :] /= confusion_matrix[i, :].sum()
+        
+        plt.figure(figsize=(10, 6))
+        sns.heatmap(confusion_matrix*100, annot=True, fmt=".1f", cmap="Blues")
+        plt.xlabel('Predicted Label')
+        plt.ylabel('True Label')
+        plt.title(f'Confusion Matrix ({model_type} - {split} set)')
+        plt.savefig(os.path.join(MODEL_FOLDER, task, model_name, f'confusion_matrix_{split}.png'))
+        plt.close()
 
 if __name__ == "__main__":
     a, b, c = get_loaders('./data/R.csv', 0.1, 0.1, 10)
@@ -465,3 +478,177 @@ if __name__ == "__main__":
         
         print(x.size(), a.size(), y.size(), smile)
         break
+
+def safe_predict(model_type, model, x, a, w, smile, loss_fn):
+    """Helper function to safely call model and loss function based on model type"""
+    if model_type == "VAE":
+        x = torch.argmax(x, dim=1).float()
+        
+        if len(x) < 100:
+            x = F.pad(x, (0, 100 - len(x)), "constant", 0)
+        
+        if x.dim() == 1:
+            x = x.unsqueeze(0)
+
+        x_reconstructed, y_pred, mu, logvar = model(x)
+        l = loss_fn(y_pred, w, x, x_reconstructed)
+    
+    elif model_type == "FP":
+        y_pred = model(smile)
+        l = loss_fn(y_pred, w)
+    
+    else:
+        y_pred = model(x, a)
+        l = loss_fn(y_pred, w)
+    
+    return y_pred, l
+
+def eval_metric(model, model_type, val_loader, task, loss_fn) -> float:
+    """Evaluate model on validation set and compute metric
+    
+    Args:
+        model: Trained model
+        model_type: Type of model ("VAE", "FP", etc.)
+        val_loader: Validation data loader
+        task: Task type ("regression" or "classification")
+    
+    Returns:
+        Computed metric (RMSE for regression, ROC-AUC for classification)
+    """
+    model.eval()
+    all_targets = []
+    all_preds = []
+    
+    with torch.no_grad():
+        for X, A, y, smiles in val_loader:
+            for i in range(len(X)):
+                x = X[i]
+                a = A[i]
+                w = y[i]
+                smile = smiles[i]
+                
+                y_pred, _ = safe_predict(model_type, model, x, a, w, smile, loss_fn)
+                
+                all_targets.append(w.cpu())
+                all_preds.append(y_pred.cpu())
+    
+    all_targets = torch.cat(all_targets).numpy()
+    all_preds = torch.cat(all_preds).numpy()
+    
+    if task == "regression":
+        metric = np.sqrt(((all_targets - all_preds) ** 2).mean())  # RMSE
+    else:
+        metric = roc_auc_score(all_targets, all_preds)  # ROC-AUC
+    
+    return metric
+
+def create_model(model_type: str, config: dict, input_dim: int, output_dim: int = 994) -> tuple[nn.Module, float | None]:
+    """Factory function to create models with specific configurations
+    
+    Args:
+        model_type: Type of model to create ("VAE", "GCN", "GAT", etc.)
+        config: Model-specific configuration parameters
+        input_dim: Input dimension (number of atom features)
+        output_dim: Output dimension (number of side effects)
+    
+    Returns:
+        Tuple of (model, reconstruction_beta) where reconstruction_beta is None for non-VAE models
+        
+    Raises:
+        ValueError: If model_type is not recognized
+    """
+    reconstruction_beta = None
+    
+    if model_type == "VAE":
+        model = VAE(
+            input_dim=100,
+            latent_dim=config['latent_dim'],
+            hidden_dim=config['hidden_dim']
+        )
+        reconstruction_beta = config['reconstruction_beta']
+    
+    elif model_type == "GCN":
+        model = GNN(
+            layer="GCNConv",
+            num_layers=config['num_layers'],
+            input_dim=input_dim,
+            output_dim=output_dim
+        )
+    
+    elif model_type == "GAT":
+        model = GNN(
+            layer="GATConv",
+            num_layers=config['num_layers'],
+            input_dim=input_dim,
+            output_dim=output_dim,
+            hidden_dim=config['hidden_dim']
+        )
+    
+    elif model_type == "MPNN":
+        model = GNN(
+            layer="MessagePassing",
+            num_layers=config['num_layers'],
+            input_dim=input_dim,
+            output_dim=output_dim,
+            hidden_dim=config['hidden_dim'],
+            num_hidden=config['num_hidden']
+        )
+    
+    elif model_type == "Transformer":
+        model = Transformer(
+            input_dim=input_dim,
+            d_model=config['d_model'],
+            nhead=config['nhead'],
+            num_layers=config['num_layers'],
+            dim_feedforward=config['dim_feedforward'],
+            output_dim=output_dim
+        )
+    
+    elif model_type == "FP":
+        model = FP(
+            radius=config['radius'],
+            n_bits=config['n_bits'],
+            output_dim=output_dim
+        )
+    
+    elif model_type == "FCNN":
+        model = FCNN(
+            input_dim=input_dim,
+            hidden_dim=config['hidden_dim'],
+            num_hidden=config['num_layers'],
+            output_dim=output_dim
+        )
+    
+    else:
+        raise ValueError(f"Unknown model type: {model_type}")
+    
+    return model, reconstruction_beta
+
+def get_model_name(model_type: str, config: dict) -> str:
+    """Generate descriptive model name with all hyperparameters
+    
+    Args:
+        model_type: Type of model ("VAE", "GCN", etc.)
+        config: Model-specific configuration parameters
+    
+    Returns:
+        Descriptive model name string with hyperparameters
+    """
+    parts = [model_type]
+    
+    # Add model-specific configs (sorted for consistency)
+    for key in sorted(config.keys()):
+        value = config[key]
+        # Shorten key names for readability
+        short_key = key.replace('num_layers', 'nlayers') \
+                        .replace('hidden_dim', 'hdim') \
+                        .replace('latent_dim', 'latent') \
+                        .replace('reconstruction_beta', 'beta') \
+                        .replace('dim_feedforward', 'ffn') \
+                        .replace('d_model', 'dmodel') \
+                        .replace('num_hidden', 'nhidden') \
+                        .replace('n_bits', 'bits')
+        
+        parts.append(f"{short_key}{value}")
+    
+    return "_".join(parts)

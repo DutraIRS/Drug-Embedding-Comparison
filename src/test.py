@@ -11,10 +11,6 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 import torch
-import torch.nn as nn
-import torch.nn.functional as F
-
-from sklearn.metrics import roc_auc_score
 
 from src.utils import *
 from src.models import *
@@ -33,7 +29,9 @@ VAL_RATIO = 0.2
 TEST_RATIO = 0.2
 BATCH_SIZE = 64
 EPOCHS = 3_000
-N_TEST_RUNS = 5
+N_TEST_RUNS = 3
+LEARNING_RATE = 1e-3
+WEIGHT_DECAY = 1e-4
 
 ### SETUP ###
 device = (
@@ -55,7 +53,7 @@ if not os.path.exists(best_configs_path):
 
 best_configs = pd.read_csv(best_configs_path)
 print(f"\nLoaded {len(best_configs)} best configurations:")
-print(best_configs[['model_type', 'best_val_loss']])
+print(best_configs[['model_type', 'val_metric']])
 
 # Get data loaders
 train_loader, val_loader, test_loader = get_loaders(FILE_PATH, VAL_RATIO, TEST_RATIO, BATCH_SIZE, task=TASK)
@@ -72,34 +70,6 @@ generator = torch.Generator(device=device)
 full_dataset = train_loader.dataset.dataset  # Get the original DrugSideEffectsDataset
 train_val_loader = DataLoader(train_val_dataset, batch_size=BATCH_SIZE, shuffle=True, 
                                generator=generator, collate_fn=full_dataset.collate_fn)
-
-print(f"\nDataset sizes:")
-print(f"  Train+Val: {len(train_val_dataset)} samples")
-print(f"  Test: {len(test_loader.dataset)} samples")
-
-def _safe_predict(model_type, model, x, a, w, smile, loss_fn):
-    """Helper function to safely call model and loss function based on model type"""
-    if model_type == "VAE":
-        x = torch.argmax(x, dim=1).float()
-        
-        if len(x) < 100:
-            x = F.pad(x, (0, 100 - len(x)), "constant", 0)
-        
-        if x.dim() == 1:
-            x = x.unsqueeze(0)
-
-        x_reconstructed, y_pred, mu, logvar = model(x)
-        l = loss_fn(y_pred, w, x, x_reconstructed)
-    
-    elif model_type == "FP":
-        y_pred = model(smile)
-        l = loss_fn(y_pred, w)
-    
-    else:
-        y_pred = model(x, a)
-        l = loss_fn(y_pred, w)
-    
-    return l
 
 def create_model_from_config(row: pd.Series, input_dim: int, output_dim: int = 994) -> tuple[nn.Module, float | None]:
     """Create model from best config row
@@ -183,6 +153,11 @@ def create_model_from_config(row: pd.Series, input_dim: int, output_dim: int = 9
     
     return model, reconstruction_beta
 
+
+print(f"\nDataset sizes:")
+print(f"  Train+Val: {len(train_val_dataset)} samples")
+print(f"  Test: {len(test_loader.dataset)} samples")
+
 # Store results for all models
 test_results = []
 
@@ -200,19 +175,14 @@ for idx, row in best_configs.iterrows():
     for test_run_idx in range(N_TEST_RUNS):
         print(f"\n  Test run {test_run_idx + 1}/{N_TEST_RUNS}")
         
-        # Create model from best config
         model, reconstruction_beta = create_model_from_config(row, input_dim)
         
         n_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
         
-        # Setup optimizer with best hyperparameters
-        learning_rate = float(row['learning_rate'])
-        weight_decay = float(row['weight_decay'])
-        
         optimizer = torch.optim.Adam(
             model.parameters(),
-            lr=learning_rate,
-            weight_decay=weight_decay
+            lr=LEARNING_RATE,
+            weight_decay=WEIGHT_DECAY
         )
         
         # Select loss function based on task
@@ -238,6 +208,7 @@ for idx, row in best_configs.iterrows():
             model.train()
             for X, A, y, smiles in train_val_loader:
                 optimizer.zero_grad()
+                batch_loss = 0
                 
                 for i in range(len(X)):
                     x = X[i]
@@ -245,11 +216,13 @@ for idx, row in best_configs.iterrows():
                     w = y[i]
                     smile = smiles[i]
                     
-                    l = _safe_predict(model_type, model, x, a, w, smile, loss_fn)
+                    y_pred, l = safe_predict(model_type, model, x, a, w, smile, loss_fn)
                     
                     epoch_train_loss += l.item()
-                    l.backward()
+                    batch_loss += l
                 
+                batch_loss /= len(X)
+                batch_loss.backward()
                 optimizer.step()
             
             # Average over drugs in loader
@@ -270,135 +243,52 @@ for idx, row in best_configs.iterrows():
         
         # Evaluate on test set
         print(f"\nEvaluating on test set...")
-        model.eval()
-        test_loss = 0
-        all_preds = []
-        all_targets = []
         
-        with torch.no_grad():
-            for X, A, y, smiles in test_loader:
-                for i in range(len(X)):
-                    x = X[i]
-                    a = A[i]
-                    w = y[i]
-                    smile = smiles[i]
-                    
-                    if model_type == "VAE":
-                        x = torch.argmax(x, dim=1).float()
-                        
-                        if len(x) < 100:
-                            x = F.pad(x, (0, 100 - len(x)), "constant", 0)
-                        
-                        if x.dim() == 1:
-                            x = x.unsqueeze(0)
-
-                        x_reconstructed, y_pred, mu, logvar = model(x)
-                        l = loss_fn(y_pred, w, x, x_reconstructed)
-                    
-                    elif model_type == "FP":
-                        y_pred = model(smile)
-                        l = loss_fn(y_pred, w)
-                    
-                    else:
-                        y_pred = model(x, a)
-                        l = loss_fn(y_pred, w)
-                    
-                    test_loss += l.item()
-                    
-                    # Collect predictions - apply sigmoid for classification
-                    if TASK == "classification":
-                        y_pred_probs = torch.sigmoid(y_pred)
-                        all_preds.append(y_pred_probs.cpu().numpy())
-                    else:
-                        all_preds.append(y_pred.cpu().numpy())
-                    
-                    all_targets.append(w.cpu().numpy())
-            
-            # Average test loss
-            test_loss /= len(test_loader.dataset)
-            
-            # Calculate metric (AUROC for classification, RMSE for regression)
-            all_preds = np.vstack(all_preds)  # Stack to shape (n_samples, 994)
-            all_targets = np.vstack(all_targets)  # Stack to shape (n_samples, 994)
-            
-            if TASK == "classification":
-                # Calculate AUROC for each side effect
-                aurocs = []
-                for se_idx in range(all_targets.shape[1]):
-                    try:
-                        # Only calculate if we have both classes
-                        if len(np.unique(all_targets[:, se_idx])) > 1:
-                            auroc = roc_auc_score(all_targets[:, se_idx], all_preds[:, se_idx])
-                            aurocs.append(auroc)
-                    except:
-                        pass  # Skip if error (e.g., all one class)
-                
-                metric_value = np.mean(aurocs) if aurocs else 0.0
-                metric_name = "AUROC"
-            else:
-                # Root Mean Squared Error for regression
-                metric_value = np.sqrt(np.mean((all_preds - all_targets) ** 2))
-                metric_name = "RMSE"
-            
-            print(f"  Run {test_run_idx + 1}: Test Loss: {test_loss:.4f}, {metric_name}: {metric_value:.4f}, Train Time: {train_time:.2f}s")
-            
-            # Store results for this run
-            test_run_results.append({
-                'run': test_run_idx + 1,
-                'test_loss': test_loss,
-                metric_name.lower(): metric_value,
-                'last_train_loss': last_train_loss,
-                'train_time_seconds': train_time
-            })
-            
-            # Save this run's model and results
-            save_losses(model_name, train_losses, task=TASK)
-            
-            specs = {
-                'model_name': model_name,
-                'model_type': model_type,
-                'n_parameters': n_params,
-                'last_train_loss': last_train_loss,
-                'test_loss': test_loss,
-                metric_name.lower(): metric_value,
-                'metric_name': metric_name,
-                'train_time_seconds': train_time,
-                'learning_rate': learning_rate,
-                'weight_decay': weight_decay,
-                'run': test_run_idx + 1
-            }
-            
-            # Add model-specific hyperparameters
-            for col in best_configs.columns:
-                if col not in ['model_name', 'model_type', 'n_parameters', 'best_val_loss', 'mean_val_loss', 'std_val_loss',
-                               'learning_rate', 'weight_decay', 'model_architecture']:
-                    if col in row and pd.notna(row[col]):
-                        specs[col] = row[col]
-            
-            save_specs(model_name, specs, task=TASK)
-            
-            # Save KDE plots for train_val, and test sets (first run only)
-            if test_run_idx == 0:
-                save_preds_kde(model, model_name, train_val_loader, model_type=model_type, task=TASK, split="train_val")
-                save_preds_kde(model, model_name, test_loader, model_type=model_type, task=TASK, split="test")
+        test_metric = eval_metric(model, model_type, test_loader, TASK, loss_fn)
+        
+        metric_name = "AUROC" if TASK == "classification" else "RMSE"
+        
+        print(f"  Run {test_run_idx + 1}: {metric_name}: {test_metric:.4f}, Train Time: {train_time:.2f}s")
+        
+        # Store results for this run
+        test_run_results.append({
+            'run': test_run_idx + 1,
+            metric_name.lower(): test_metric,
+            'last_train_loss': last_train_loss,
+            'train_time_seconds': train_time
+        })
+        
+        # Save this run's model and results
+        save_losses(model_name, train_losses, task=TASK)
+        
+        specs = {
+            'model_name': model_name,
+            'model_type': model_type,
+            'n_parameters': n_params,
+            'last_train_loss': last_train_loss,
+            metric_name.lower(): test_metric,
+            'metric_name': metric_name,
+            'train_time_seconds': train_time,
+            'run': test_run_idx + 1
+        }
+        
+        save_specs(model_name, specs, task=TASK)
+        
+        save_preds_kde(model, model_name, train_val_loader, model_type=model_type, task=TASK, split="train_val")
+        save_preds_kde(model, model_name, test_loader, model_type=model_type, task=TASK, split="test")
     
-    # Calculate statistics across test runs
-    test_losses_all_runs = [r['test_loss'] for r in test_run_results]
+    # Calculate statistics across test runs=
     metrics_all_runs = [r[metric_name.lower()] for r in test_run_results]
     train_times_all_runs = [r['train_time_seconds'] for r in test_run_results]
     
-    mean_test_loss = np.mean(test_losses_all_runs)
-    std_test_loss = np.std(test_losses_all_runs)
     mean_metric = np.mean(metrics_all_runs)
     std_metric = np.std(metrics_all_runs)
     mean_train_time = np.mean(train_times_all_runs)
     std_train_time = np.std(train_times_all_runs)
     
     print(f"\n  Summary for {model_type}:")
-    print(f"    Test Loss: {mean_test_loss:.4f} ± {std_test_loss:.4f}")
     print(f"    {metric_name}: {mean_metric:.4f} ± {std_metric:.4f}")
     print(f"    Train Time: {mean_train_time:.2f}s ± {std_train_time:.2f}s")
-    print(f"    Individual test losses: {[f'{v:.4f}' for v in test_losses_all_runs]}")
     print(f"    Individual {metric_name}s: {[f'{v:.4f}' for v in metrics_all_runs]}")
     print(f"    Individual train times: {[f'{v:.2f}s' for v in train_times_all_runs]}")
     
@@ -406,10 +296,6 @@ for idx, row in best_configs.iterrows():
     test_results.append({
         'model_type': model_type,
         'n_parameters': n_params,
-        'learning_rate': learning_rate,
-        'weight_decay': weight_decay,
-        'mean_test_loss': mean_test_loss,
-        'std_test_loss': std_test_loss,
         f'mean_{metric_name.lower()}': mean_metric,
         f'std_{metric_name.lower()}': std_metric,
         'mean_train_time_seconds': mean_train_time,
@@ -421,7 +307,7 @@ for idx, row in best_configs.iterrows():
 
 ### SAVE AND VISUALIZE FINAL RESULTS ###
 results_df = pd.DataFrame(test_results)
-results_df = results_df.sort_values('mean_test_loss')
+results_df = results_df.sort_values(f'mean_{metric_name.lower()}')
 
 print("\n" + "="*60)
 print("FINAL TEST RESULTS (sorted by mean test loss)")
@@ -440,54 +326,33 @@ os.makedirs(vis_dir, exist_ok=True)
 
 # 1. Test loss comparison with error bars
 plt.figure(figsize=(12, 6))
-plt.bar(results_df['model_type'], results_df['mean_test_loss'], 
-        yerr=results_df['std_test_loss'], capsize=5, color='steelblue', alpha=0.7)
+plt.bar(results_df['model_type'], results_df[f'mean_{metric_name.lower()}'], 
+        yerr=results_df[f'std_{metric_name.lower()}'], capsize=5, color='steelblue', alpha=0.7)
 plt.xlabel('Model Type', fontsize=12)
-plt.ylabel('Mean Test Loss', fontsize=12)
-plt.title(f'Test Loss Comparison Across Models ({N_TEST_RUNS} runs each)', fontsize=14)
+plt.ylabel(f'Mean Test {metric_name}', fontsize=12)
+plt.title(f'Test {metric_name} Comparison Across Models ({N_TEST_RUNS} runs each)', fontsize=14)
 plt.xticks(rotation=45)
 plt.tight_layout()
-plt.savefig(os.path.join(vis_dir, 'test_loss_comparison.png'), dpi=300)
+plt.savefig(os.path.join(vis_dir, f'test_{metric_name.lower()}_comparison.png'), dpi=300)
 plt.close()
 
-# 2. Multiple metrics comparison with error bars
-fig, axes = plt.subplots(1, 2, figsize=(14, 6))
-
-axes[0].bar(results_df['model_type'], results_df['mean_test_loss'], 
-            yerr=results_df['std_test_loss'], capsize=5, color='steelblue', alpha=0.7)
-axes[0].set_title(f'Mean Test Loss ({N_TEST_RUNS} runs)')
-axes[0].set_ylabel('Loss')
-axes[0].tick_params(axis='x', rotation=45)
-
-metric_col = f'mean_{metric_name.lower()}'
-std_col = f'std_{metric_name.lower()}'
-axes[1].bar(results_df['model_type'], results_df[metric_col], 
-            yerr=results_df[std_col], capsize=5, color='coral', alpha=0.7)
-axes[1].set_title(f'Mean {metric_name} ({N_TEST_RUNS} runs)')
-axes[1].set_ylabel(metric_name)
-axes[1].tick_params(axis='x', rotation=45)
-
-plt.tight_layout()
-plt.savefig(os.path.join(vis_dir, 'all_metrics_comparison.png'), dpi=300)
-plt.close()
-
-# 3. Parameters vs Performance (using mean test loss)
+# 2. Parameters vs Performance (using mean test loss)
 plt.figure(figsize=(10, 6))
-plt.errorbar(results_df['n_parameters'], results_df['mean_test_loss'], 
-             yerr=results_df['std_test_loss'], fmt='o', markersize=10, 
+plt.errorbar(results_df['n_parameters'], results_df[f'mean_{metric_name.lower()}'],
+             yerr=results_df[f'std_{metric_name.lower()}'], fmt='o', markersize=10, 
              alpha=0.6, capsize=5, elinewidth=2)
 for idx, row in results_df.iterrows():
     plt.annotate(row['model_type'], 
-                (row['n_parameters'], row['mean_test_loss']),
+                (row['n_parameters'], row[f'mean_{metric_name.lower()}']),
                 xytext=(5, 5), textcoords='offset points', fontsize=10)
 plt.xlabel('Number of Parameters', fontsize=12)
-plt.ylabel('Mean Test Loss', fontsize=12)
+plt.ylabel(f'Mean Test {metric_name}', fontsize=12)
 plt.title(f'Model Complexity vs Test Performance ({N_TEST_RUNS} runs)', fontsize=14)
 plt.tight_layout()
 plt.savefig(os.path.join(vis_dir, 'parameters_vs_performance.png'), dpi=300)
 plt.close()
 
-# 4. Training time comparison
+# 3. Training time comparison
 plt.figure(figsize=(12, 6))
 plt.bar(results_df['model_type'], results_df['mean_train_time_seconds'], 
         yerr=results_df['std_train_time_seconds'], capsize=5, color='green', alpha=0.7)
@@ -500,16 +365,3 @@ plt.savefig(os.path.join(vis_dir, 'training_time_comparison.png'), dpi=300)
 plt.close()
 
 print(f"\nVisualization plots saved to: {vis_dir}")
-
-# Print best model
-best_model = results_df.iloc[0]
-print("\n" + "="*60)
-print("BEST MODEL")
-print("="*60)
-print(f"Model Type: {best_model['model_type']}")
-print(f"Mean Test Loss: {best_model['mean_test_loss']:.4f} ± {best_model['std_test_loss']:.4f}")
-print(f"Mean {metric_name}: {best_model[metric_col]:.4f} ± {best_model[std_col]:.4f}")
-print(f"Mean Train Time: {best_model['mean_train_time_seconds']:.2f}s ± {best_model['std_train_time_seconds']:.2f}s")
-print(f"Parameters: {best_model['n_parameters']:,}")
-print(f"Number of runs: {best_model['n_runs']}")
-print("="*60)

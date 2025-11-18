@@ -357,8 +357,7 @@ class FP(nn.Module):
         fp = AllChem.GetMorganFingerprintAsBitVect(mol, self.radius, nBits=self.n_bits)
         
         # Convert to tensor
-        fp_array = torch.zeros(self.n_bits)
-        fp_array[:] = torch.tensor(list(fp), dtype=torch.float32)
+        fp_array = torch.tensor(list(fp), dtype=torch.float32)
         
         # Predict
         y = self.linear(fp_array)
