@@ -31,7 +31,7 @@ Write-Host "[Step 2/3] Analyzing results and finding best configurations..." -Fo
 Write-Host "This will generate best_configs.csv and visualization plots." -ForegroundColor Gray
 Write-Host ""
 
-python src/analyze_results.py
+python src/analyze_results.py --task classification
 
 if ($LASTEXITCODE -ne 0) {
     Write-Host ""
@@ -62,11 +62,12 @@ Write-Host "CLASSIFICATION Pipeline Complete!" -ForegroundColor Green
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "Results saved to:" -ForegroundColor Cyan
-Write-Host "  - saved_models/all_results.csv" -ForegroundColor White
-Write-Host "  - saved_models/best_configs.csv" -ForegroundColor White
-Write-Host "  - saved_models/final_test_results.csv" -ForegroundColor White
-Write-Host "  - saved_models/analysis_plots/" -ForegroundColor White
-Write-Host "  - saved_models/final_test_plots/" -ForegroundColor White
+Write-Host "  - saved_models/classification/" -ForegroundColor White
+Write-Host "  - diagnostics/classification/all_results.csv" -ForegroundColor White
+Write-Host "  - diagnostics/classification/best_configs.csv" -ForegroundColor White
+Write-Host "  - diagnostics/classification/final_test_results.csv" -ForegroundColor White
+Write-Host "  - diagnostics/classification/analysis_plots/" -ForegroundColor White
+Write-Host "  - diagnostics/classification/final_test_plots/" -ForegroundColor White
 Write-Host ""
 Write-Host "Evaluation Metric: AUROC (Area Under ROC Curve)" -ForegroundColor Cyan
 Write-Host ""

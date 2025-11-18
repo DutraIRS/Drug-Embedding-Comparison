@@ -2,7 +2,7 @@
 Final Project for Bachelor's Degree in Data Science and AI
 
 ## Overview
-This project compares different molecular embedding approaches for predicting drug side effects. We implement and evaluate 7 different model architectures on a dataset of molecules and their associated 994 side effects.
+This project compares different molecular embedding approaches for predicting drug side effects. I implemented and evaluated 7 different model architectures on a dataset of molecules and their associated 994 side effects.
 
 The pipeline supports **two distinct tasks**:
 - **Regression**: Predict frequency scores (0-5 scale)
@@ -25,44 +25,66 @@ src/
 ├── models.py          # Model architectures (VAE, GNN, Transformer, FP, FCNN)
 ├── layers.py          # Custom GNN layers (GCNConv, GATConv, MessagePassing)
 ├── utils.py           # Data loading, loss functions, saving utilities
-├── train.py           # Grid search training with 3 runs per configuration
+├── train.py           # Grid search training per configuration
 ├── analyze_results.py # Consolidate results and find best configurations
-└── test.py            # Final evaluation on test set with 5 runs per model
+├── test.py            # Final evaluation on test set with 3 runs per model
+└── trim_data.ipynb    # Notebook for data preprocessing and subset creation
 
 test/
 ├── test_layers.py     # Unit tests for GNN layers
-├── test_models.py     # Unit tests for model architectures
-├── test_utils.py      # Unit tests for utilities
-├── test_loss.py       # Unit tests for loss functions
-└── test_metrics.py    # Unit tests for evaluation metrics (AUROC, RMSE)
+└── test_models.py     # Unit tests for model architectures
 
 data/
 ├── R.csv              # Full dataset (molecules × side effects)
-├── R_100.csv          # Subset for quick experiments (100 samples)
+├── R_100.csv          # Subset for quick experiments (samples with less than 100 atoms)
 ├── smiles.csv         # SMILES strings for full dataset
 └── smiles_100.csv     # SMILES strings for subset
 
-saved_models/          # Trained model checkpoints
-└── [model_name]/      # Individual model directories
-    ├── model_weights.pt      # Model state dict
-    ├── specs.json            # Hyperparameters and architecture
-    ├── losses.png            # Training curves
-    └── kde_plot.png          # Prediction distribution
+saved_models/          # Trained model checkpoints (organized by task)
+├── regression/        # Regression task models
+│   └── [model_name]/
+│       ├── model_weights.pt      # Model state dict
+│       ├── specs.csv             # Hyperparameters and architecture
+│       ├── losses.csv            # Training history
+│       ├── loss_plot.png         # Training curves
+│       └── kde_plot.png          # Prediction distribution
+└── classification/    # Classification task models
+    └── [model_name]/
+        ├── model_weights.pt      # Model state dict
+        ├── specs.csv             # Hyperparameters and architecture
+        ├── losses.csv            # Training history
+        ├── loss_plot.png         # Training curves
+        └── kde_plot.png          # Prediction distribution
 
-diagnostics/           # Analysis results and visualizations
-├── all_results.csv    # All training configurations and results
-├── best_configs.csv   # Best configuration per model type
-├── final_test_results.csv  # Test set evaluation results
-├── analysis_plots/    # Training analysis visualizations
-│   ├── validation_loss_boxplot.png
-│   ├── best_configs_comparison.png
-│   ├── complexity_vs_performance.png
-│   └── hyperparameter_heatmaps.png
-└── final_test_plots/  # Test set evaluation visualizations
-    ├── test_loss_comparison.png
-    ├── all_metrics_comparison.png
-    ├── parameters_vs_performance.png
-    └── training_time_comparison.png
+diagnostics/           # Analysis results and visualizations (organized by task)
+├── regression/        # Regression task diagnostics
+│   ├── all_results.csv           # All training configurations and results
+│   ├── best_configs.csv          # Best configuration per model type
+│   ├── final_test_results.csv    # Test set evaluation results
+│   ├── analysis_plots/           # Training analysis visualizations
+│   │   ├── val_loss_by_model_type.png
+│   │   ├── best_configs_comparison.png
+│   │   ├── params_vs_loss.png
+│   │   └── [model]_lr_wd_heatmap.png
+│   └── final_test_plots/         # Test set evaluation visualizations
+│       ├── test_loss_comparison.png
+│       ├── test_metric_comparison.png
+│       ├── params_vs_performance.png
+│       └── training_time_comparison.png
+└── classification/    # Classification task diagnostics
+    ├── all_results.csv           # All training configurations and results
+    ├── best_configs.csv          # Best configuration per model type
+    ├── final_test_results.csv    # Test set evaluation results
+    ├── analysis_plots/           # Training analysis visualizations
+    │   ├── val_loss_by_model_type.png
+    │   ├── best_configs_comparison.png
+    │   ├── params_vs_loss.png
+    │   └── [model]_lr_wd_heatmap.png
+    └── final_test_plots/         # Test set evaluation visualizations
+        ├── test_loss_comparison.png
+        ├── test_metric_comparison.png
+        ├── params_vs_performance.png
+        └── training_time_comparison.png
 
 run_pipeline_regression.ps1      # PowerShell script for regression task
 run_pipeline_classification.ps1  # PowerShell script for classification task
@@ -96,7 +118,14 @@ Where $\alpha=0.03$ down-weights negative samples
 
 ## Quick Start
 
-### Option 1: Run Full Pipeline (Automated)
+### 1. Install Dependencies
+```powershell
+python -m venv venv
+venv\Scripts\activate
+pip install -r requirements.txt
+```
+
+### 2. Run Pipeline
 
 **For Regression Task:**
 ```powershell
@@ -108,41 +137,25 @@ Where $\alpha=0.03$ down-weights negative samples
 .\run_pipeline_classification.ps1
 ```
 
+**Run Both Tasks in Parallel:**
+You can run both pipelines simultaneously in separate terminals without conflicts:
+- Terminal 1: `.\run_pipeline_regression.ps1`
+- Terminal 2: `.\run_pipeline_classification.ps1`
+
+Each pipeline saves results to task-specific directories:
+- Regression: `saved_models/regression/` and `diagnostics/regression/`
+- Classification: `saved_models/classification/` and `diagnostics/classification/`
+
 Each pipeline will sequentially:
-1. Train all models with grid search (3 runs per configuration)
+1. Train all models with grid search
 2. Analyze results and select best configurations
-3. Test best models on test set (5 runs per model)
+3. Test best models on test set (3 runs per model)
 
-### Option 2: Manual Execution
-
-#### 1. Install Dependencies
-```bash
-pip install -r requirements.txt
-```
-
-Required packages:
-- PyTorch 2.6.0+ (with CUDA support for GPU training)
-- RDKit (for molecular fingerprints)
-- NumPy, Pandas, Matplotlib, Seaborn
-- scikit-learn (for AUROC metric)
-- pytest, pytest-cov (for testing)
-
-#### 2. Train Models
-```bash
-# Regression task (default)
-python src/train.py --task regression
-
-# Classification task
-python src/train.py --task classification
-```
-
-**Command-line Arguments:**
-- `--task`: Task type - `regression` (default) or `classification`
 
 **Features:**
 - Grid search over model-specific hyperparameters
 - **3 independent runs** per configuration for statistical robustness
-- Automatic model checkpointing (saves final model, not best)
+- Automatic model checkpointing
 - Tracks mean ± std validation loss across runs
 - **Task-specific metrics**: RMSE for regression, AUROC for classification
 - Generates loss curves and KDE plots
@@ -158,71 +171,58 @@ python src/train.py --task classification
 - **FCNN**: num_layers, hidden_dim
 
 **Training Configuration:**
-- Dataset: `data/R_100.csv` (100 samples)
+- Dataset: `data/R_100.csv` (samples with less than 100 atoms)
 - Split: 60% train / 20% val / 20% test
-- Epochs: 2 (configurable via `EPOCHS` variable)
-- Runs per config: 3 (configurable via `N_RUNS`)
+- Epochs: 300
 - Device: CUDA if available, else CPU
 - **Task-specific loss**:
   - Regression: `DataDrivenLoss` (Weighted RMSE with α=0.03)
   - Classification: `WeightedBCELoss` (Weighted BCE with α=0.03)
 
-#### 3. Analyze Results
-```bash
-python src/analyze_results.py
-```
-
-**Note:** This step is task-agnostic - it analyzes whichever results are in `saved_models/`.
-
 **Generates:**
-- `diagnostics/all_results.csv` - Complete grid search results
-- `diagnostics/best_configs.csv` - Best configuration per model type (selected by mean validation metric)
-- `diagnostics/analysis_plots/` - Comparative visualizations:
+- `diagnostics/{task}/all_results.csv` - Complete grid search results
+- `diagnostics/{task}/best_configs.csv` - Best configuration per model type (selected by mean validation loss)
+- `diagnostics/{task}/analysis_plots/` - Comparative visualizations:
   - Validation loss distribution by model type (boxplot)
   - Best configurations comparison (bar chart)
   - Model complexity vs performance (scatter plot)
   - Hyperparameter impact heatmaps (learning rate × weight decay)
 
-#### 4. Final Testing
-```bash
-# Regression task (default)
-python src/test.py --task regression
-
-# Classification task
-python src/test.py --task classification
-```
-
-**Command-line Arguments:**
-- `--task`: Task type - `regression` (default) or `classification`
-
+### 3. Final Testing
 **Features:**
 - Loads best configurations from `analyze_results.py`
-- Trains each model on combined train+val set
-- **5 independent test runs** per model for robust evaluation
+- Trains each model on combined train+val set for 3000 epochs
+- **3 independent test runs** per model for robust evaluation
 - Evaluates on held-out test set
 - Reports mean ± std for test loss and **task-specific metric** (RMSE or AUROC)
 - Tracks and reports training time for each model
 - Generates comparative visualizations with error bars
 
 **Outputs:**
-- `diagnostics/final_test_results.csv` - Test metrics for all models
-- `diagnostics/final_test_plots/` - Comparative test visualizations
+- `diagnostics/{task}/final_test_results.csv` - Test metrics for all models
+- `diagnostics/{task}/final_test_plots/` - Comparative test visualizations
 
-#### 5. Run Tests
-```bash
-# Quick test run
-pytest test/ -q
-
-# With coverage report
-pytest --cov=src --cov-report=term-missing --cov-report=html
+### 4. Run Tests
+```powershell
+pytest
 ```
 
+**Test Configuration:**
+- Configured in `pytest.ini` to focus on core modules
+- Coverage targets: `src.layers` and `src.models` only
+- Automatic HTML report generation in `htmlcov/`
+
 **Test Coverage:**
-- Core modules: `layers.py` (100%), `models.py` (86%)
-- **76 tests** covering:
-  - Model architectures and GNN layers (47 tests)
-  - Loss functions - DataDrivenLoss and WeightedBCELoss (18 tests)
-  - Evaluation metrics - AUROC and RMSE (11 tests)
+- **layers.py**: 100% coverage (43 statements)
+- **models.py**: 100% coverage (151 statements)  
+- **utils.py**: 70% coverage (291 statements)
+- **87 tests total** covering:
+  - Loss functions (DataDrivenLoss, WeightedBCELoss)
+  - Dataset loading and preprocessing
+  - Custom GNN layers and pooling operations
+  - All model architectures (VAE, FCNN, GNN variants, Transformer, FP)
+  - Save/load utilities
+  - Edge cases and error handling
 - HTML coverage report: `htmlcov/index.html`
 
 ## Model Architecture Details
@@ -258,7 +258,7 @@ pytest --cov=src --cov-report=term-missing --cov-report=html
 ## Data Format
 - **Input**: Molecular graphs
   - SMILES strings → RDKit molecular objects
-  - Atomic features: one-hot encoded atom types (100 possible)
+  - Atomic features: one-hot encoded atom types
   - Adjacency matrix: binary connectivity
 - **Output**: 994-dimensional vector
   - **Regression**: Side effect frequencies (0-5 scale)
@@ -270,51 +270,3 @@ pytest --cov=src --cov-report=term-missing --cov-report=html
   - **Regression**: Weighted RMSE - penalizes errors on non-zero targets more than zero targets
   - **Classification**: Weighted BCE - penalizes false positives (predicting 1 when true is 0) less than false negatives
   - Both use α=0.03 to handle 95% sparsity (only ~5% of pairs have associations)
-
-## Experimental Design
-
-### Multiple Runs for Statistical Robustness
-- **Training**: 3 runs per hyperparameter configuration
-  - Reports: mean ± std validation loss
-  - Selects best config based on **mean** validation loss
-- **Testing**: 5 runs per best model
-  - Reports: mean ± std test loss and RMSE
-  - Provides confidence intervals for model comparison
-
-### No Early Stopping
-- Models are trained for fixed number of epochs
-- **Final model** (last epoch) is saved and used for evaluation
-- This ensures consistent training across all runs
-- Simpler and more reproducible than early stopping
-
-### Reproducibility
-- Fixed random seeds (42) throughout pipeline
-- All hyperparameters logged in `specs.json`
-- Model architectures saved as text summaries
-- Complete experiment tracking for reproducibility
-
-## Results Interpretation
-
-### Key Metrics
-- **Validation Loss**: Used for hyperparameter selection (lower is better for both tasks)
-- **Test Loss**: Final model performance on held-out data
-- **Regression Metric**: RMSE (Root Mean Squared Error) - lower is better
-- **Classification Metric**: AUROC (Area Under ROC Curve) - higher is better (range: 0-1)
-- **Statistical Significance**: Error bars show std across multiple runs
-
-### Expected Outputs
-After running the full pipeline, you can compare:
-1. Model ranking by test performance (task-specific metric)
-2. Trade-offs between model complexity and accuracy
-3. Impact of hyperparameters on each model type
-4. Prediction distributions (KDE plots)
-5. Regression vs Classification performance differences
-
-## Hardware Requirements
-- **GPU**: Recommended for faster training (CUDA-compatible NVIDIA GPU)
-- **CPU**: Works but significantly slower
-- **RAM**: 8GB+ recommended
-- **Storage**: ~500MB for models and results (depends on grid search size)
-
-## License
-See LICENSE file for details.
