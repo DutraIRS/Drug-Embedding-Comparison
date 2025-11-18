@@ -98,7 +98,9 @@ Predicts frequency scores on a 0-5 scale where:
 - 1-5 = increasing frequency (very rare to very frequent)
 
 **Loss Function:** Weighted RMSE (Root Mean Squared Error)
-$$\mathcal{L}_{\text{RMSE}} = \sqrt{\frac{1}{DS}\sum_{i,j} w_{ij}(y_{ij}-\hat{y}_{ij})^2}$$
+```math
+\mathcal{L}_{\text{RMSE}} = \sqrt{\frac{1}{DS}\sum_{i,j} w_{ij}(y_{ij}-\hat{y}_{ij})^2}
+```
 
 Where $w_{ij} = \alpha$ if $y_{ij}=0$, else $1$ (default $\alpha=0.03$)
 
@@ -110,7 +112,9 @@ Binary prediction of side effect presence/absence:
 - 0 = no association (original score = 0)
 
 **Loss Function:** Weighted Binary Cross-Entropy
-$$\mathcal{L}_{\text{BCE}} = -\frac{1}{DS}\sum_{i,j}[y_{ij}\log(\hat{p}_{ij}) + \alpha(1-y_{ij})\log(1-\hat{p}_{ij})]$$
+```math
+\mathcal{L}_{\text{BCE}} = -\frac{1}{DS}\sum_{i,j}[y_{ij}\log(\hat{p}_{ij}) + \alpha(1-y_{ij})\log(1-\hat{p}_{ij})]
+```
 
 Where $\alpha=0.03$ down-weights negative samples
 
